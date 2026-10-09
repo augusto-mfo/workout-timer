@@ -29,21 +29,47 @@ This repo contains a single file: **`index.html`**. There is no build step, no d
 - Flow: Exercise screen → Start → countdown → Rest timer → next set → ... → Final
 - Use case: Isometric holds (plank, wall sit, etc.)
 
-## CSS System
+## Visual Design (v2 — Glassmorphism)
 
-### Base Button
-- `.btn` — shared: width 100%, padding 1rem 2rem, font 1.2rem bold, border-radius 8px, filter transition
-- Hover: `brightness(1.1)`, Active: `brightness(0.95)`
+### Framework
+- **Tailwind CSS** via CDN (`cdn.tailwindcss.com`) — utility classes for layout
+- Custom CSS for glassmorphism effects
 
-### Button Variants
-- `.btn-primary` — blue (#0f3460) — Start, Skip Rest
-- `.btn-done` — red-pink (#e94560) — Done
-- `.btn-start-exercise` — green (#22c55e) — Start exercise
-- `.btn-restart` — blue (#0f3460) — Back to Start, Start Over
+### Background
+- Animated gradient (`gradientShift` keyframes, 15s loop)
+- Colors: dark purple → blue → indigo (#0f0c29, #302b63, #24243e, #1a1a2e, #0f3460, #16213e)
+- 3 glow orbs with `pulse-glow` animation (blue, purple, cyan)
 
-### Layout Containers
-- `.rep-buttons`, `.rest-buttons` — flex column with `gap: 0.75rem`
-- `.mode-selector` — flex row with `gap: 0.75rem`
+### Glassmorphism Components
+
+#### Main Container (`.glass`)
+- `backdrop-filter: blur(20px)` with `rgba(255,255,255,0.05)` background
+- Semi-transparent border, large border-radius (1.5rem)
+- Box shadow with inset highlight
+
+#### Buttons (`.glass-btn`)
+- Base: `backdrop-filter: blur(10px)`, rgba background, border
+- Hover: `translateY(-1px)`, increased brightness, shadow
+- Active: `translateY(0)`, slight dim
+
+#### Button Variants
+- `.glass-btn-primary` — blue tint (rgba 59,130,246) — Start, Skip Rest
+- `.glass-btn-done` — red tint (rgba 239,68,68) — Done
+- `.glass-btn-exercise` — green tint (rgba 34,197,94) — Start exercise
+- Default — neutral glass — Back to Start, Start Over
+
+#### Inputs (`.glass-input`)
+- `backdrop-filter: blur(8px)`, rgba background
+- Focus: blue border ring, increased brightness
+
+#### Mode Selector (`.mode-btn`)
+- Glass style with active state having blue glow
+- Flex row with `gap: 0.75rem`
+
+#### Layout
+- `.btn-group` — flex column, `gap: 0.75rem`
+- `.section-label` — custom label styling (0.875rem, slate-400)
+- `.mode-section` — `display: none !important` / `display: block !important` for mode switching
 
 ### Timer
 - SVG circle with `stroke-dasharray`/`stroke-dashoffset` for countdown animation
@@ -51,7 +77,10 @@ This repo contains a single file: **`index.html`**. There is no build step, no d
 - Shared by both exercise and rest timers (`.timer-container`, `.timer-svg`, `.timer-progress`, `.timer-text`)
 
 ### Titles
-- `.title` — shared: 1.8rem bold, 1.5rem bottom margin
+- `.title` — 2rem bold, white with text shadow
+- `.rep-info` — 2rem bold, white
+- `.exercise-info` — 1.5rem bold, white
+- `.final-subtitle` — 1.125rem, slate-400, line-height 1.6
 
 ## JavaScript State
 

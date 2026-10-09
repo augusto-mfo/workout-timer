@@ -4,168 +4,186 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Workout Timer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.7; }
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      background: #1a1a2e;
-      color: #eee;
+      animation: gradientShift 15s ease infinite;
+      background-size: 400% 400%;
+      background-image: linear-gradient(
+        -45deg,
+        #0f0c29,
+        #302b63,
+        #24243e,
+        #1a1a2e,
+        #0f3460,
+        #16213e
+      );
     }
 
-    .container {
-      text-align: center;
-      padding: 2rem;
-      max-width: 400px;
-      width: 100%;
+    .glass {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1.5rem;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
-    .title {
-      font-size: 1.8rem;
-      font-weight: bold;
-      margin-bottom: 1.5rem;
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
     }
 
-    .screen {
-      display: none;
-    }
-
-    .screen.active {
-      display: block;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 0.95rem;
-      color: #aaa;
-    }
-
-    input[type="number"] {
-      width: 100%;
-      padding: 0.75rem;
-      margin-bottom: 1.25rem;
-      border: 1px solid #444;
-      border-radius: 8px;
-      background: #16213e;
-      color: #eee;
-      font-size: 1.1rem;
-      text-align: center;
-    }
-
-    input[type="number"]:focus {
-      outline: none;
-      border-color: #0f3460;
-    }
-
-    .btn {
-      display: inline-block;
-      width: 100%;
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 0.75rem;
+      color: #e2e8f0;
+      font-weight: 600;
       padding: 1rem 2rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.2rem;
-      font-weight: bold;
+      font-size: 1.125rem;
       cursor: pointer;
-      transition: filter 0.2s;
+      transition: all 0.2s ease;
+      width: 100%;
     }
 
-    .btn:hover {
-      filter: brightness(1.1);
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
 
-    .btn:active {
-      filter: brightness(0.95);
+    .glass-btn:active {
+      transform: translateY(0);
+      background: rgba(255, 255, 255, 0.12);
     }
 
-    .btn-primary {
-      background: #0f3460;
-      color: #eee;
+    .glass-btn-primary {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: rgba(59, 130, 246, 0.4);
     }
 
-    .btn-done {
-      background: #e94560;
-      color: #fff;
+    .glass-btn-primary:hover {
+      background: rgba(59, 130, 246, 0.45);
+      border-color: rgba(59, 130, 246, 0.6);
     }
 
-    .btn-start-exercise {
-      background: #22c55e;
-      color: #fff;
+    .glass-btn-done {
+      background: rgba(239, 68, 68, 0.3);
+      border-color: rgba(239, 68, 68, 0.4);
     }
 
-    .btn-restart {
-      background: #0f3460;
-      color: #eee;
+    .glass-btn-done:hover {
+      background: rgba(239, 68, 68, 0.45);
+      border-color: rgba(239, 68, 68, 0.6);
     }
 
-    .mode-selector {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
+    .glass-btn-exercise {
+      background: rgba(34, 197, 94, 0.3);
+      border-color: rgba(34, 197, 94, 0.4);
+    }
+
+    .glass-btn-exercise:hover {
+      background: rgba(34, 197, 94, 0.45);
+      border-color: rgba(34, 197, 94, 0.6);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.75rem;
+      color: #e2e8f0;
+      font-size: 1.125rem;
+      padding: 0.875rem 1rem;
+      width: 100%;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .glass-input:focus {
+      outline: none;
+      border-color: rgba(59, 130, 246, 0.6);
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .glass-input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
     }
 
     .mode-btn {
-      font-size: 1.1rem;
-      background: #16213e;
-      color: #aaa;
-      border: 2px solid #333;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      color: #94a3b8;
+      font-weight: 500;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
       flex: 1;
     }
 
-    .mode-btn.active {
-      background: #0f3460;
-      color: #eee;
-      border-color: #0f3460;
-    }
-
     .mode-btn:hover {
-      background: #1a4a8a;
-      color: #eee;
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
     }
 
-    .mode-btn.active:hover {
-      background: #1a4a8a;
+    .mode-btn.active {
+      background: rgba(59, 130, 246, 0.25);
+      border-color: rgba(59, 130, 246, 0.5);
+      color: #e2e8f0;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
     }
 
     .mode-section {
-      display: none;
+      display: none !important;
     }
 
     .mode-section.active {
-      display: block;
+      display: block !important;
     }
 
-    .rep-buttons {
+    .section-label {
+      display: block;
+      font-size: 0.875rem;
+      color: #94a3b8;
+      margin-bottom: 0.5rem;
+    }
+
+    .btn-group {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
       width: 100%;
-    }
-
-    .rep-info {
-      font-size: 2rem;
-      font-weight: bold;
-      margin-bottom: 2rem;
-    }
-
-    .exercise-info {
-      font-size: 1.5rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-    }
-
-    .exercise-label {
-      font-size: 1.1rem;
-      color: #aaa;
-      margin-bottom: 0.5rem;
     }
 
     .timer-container {
@@ -183,7 +201,7 @@
 
     .timer-bg {
       fill: none;
-      stroke: #2a2a4a;
+      stroke: rgba(255, 255, 255, 0.1);
       stroke-width: 10;
     }
 
@@ -201,61 +219,140 @@
       transform: translate(-50%, -50%);
       font-size: 4rem;
       font-weight: bold;
+      color: #f1f5f9;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     }
 
-    .rest-buttons {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      width: 100%;
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 1.5rem;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .rep-info {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 2rem;
+    }
+
+    .exercise-info {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 1rem;
+    }
+
+    .exercise-label {
+      font-size: 1.125rem;
+      color: #94a3b8;
+      margin-bottom: 0.5rem;
     }
 
     .final-subtitle {
-      font-size: 1.1rem;
-      color: #aaa;
+      font-size: 1.125rem;
+      color: #94a3b8;
       margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .glow-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.3;
+      animation: pulse-glow 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .glow-orb-1 {
+      width: 300px;
+      height: 300px;
+      background: #3b82f6;
+      top: -100px;
+      left: -100px;
+    }
+
+    .glow-orb-2 {
+      width: 400px;
+      height: 400px;
+      background: #8b5cf6;
+      bottom: -150px;
+      right: -150px;
+      animation-delay: 2s;
+    }
+
+    .glow-orb-3 {
+      width: 250px;
+      height: 250px;
+      background: #06b6d4;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: 4s;
     }
   </style>
 </head>
-<body>
-  <div class="container">
+<body class="min-h-screen flex items-center justify-center p-4">
+  <!-- Glow Orbs -->
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+  <div class="glow-orb glow-orb-3"></div>
+
+  <div class="glass p-8 max-w-md w-full">
     <!-- Setup Screen -->
     <div id="setup-screen" class="screen active">
       <div class="title">Workout Timer</div>
-      <div class="mode-selector">
-        <button class="btn mode-btn active" onclick="selectMode('reps')">Reps</button>
-        <button class="btn mode-btn" onclick="selectMode('timed')">Timed Exercise</button>
+      <div class="mode-selector flex gap-3 mb-6">
+        <button class="mode-btn active" onclick="selectMode('reps')">Reps</button>
+        <button class="mode-btn" onclick="selectMode('timed')">Timed Exercise</button>
       </div>
 
       <!-- Reps Mode -->
       <div id="reps-section" class="mode-section active">
-        <label for="reps-input">Number of Reps</label>
-        <input type="number" id="reps-input" min="1" value="10">
-        <label for="rest-input">Rest Between Reps (seconds)</label>
-        <input type="number" id="rest-input" min="1" value="30">
+        <label for="reps-input" class="section-label">Number of Reps</label>
+        <input type="number" id="reps-input" min="1" value="10" class="glass-input">
+        <label for="rest-input" class="section-label">Rest Between Reps (seconds)</label>
+        <input type="number" id="rest-input" min="1" value="30" class="glass-input">
       </div>
 
       <!-- Timed Exercise Mode -->
       <div id="timed-section" class="mode-section">
-        <label for="sets-input">Number of Sets</label>
-        <input type="number" id="sets-input" min="1" value="5">
-        <label for="hold-input">Hold Time (seconds)</label>
-        <input type="number" id="hold-input" min="1" value="30">
-        <label for="timed-rest-input">Rest Between Sets (seconds)</label>
-        <input type="number" id="timed-rest-input" min="1" value="30">
+        <label for="sets-input" class="section-label">Number of Sets</label>
+        <input type="number" id="sets-input" min="1" value="5" class="glass-input">
+        <label for="hold-input" class="section-label">Hold Time (seconds)</label>
+        <input type="number" id="hold-input" min="1" value="30" class="glass-input">
+        <label for="timed-rest-input" class="section-label">Rest Between Sets (seconds)</label>
+        <input type="number" id="timed-rest-input" min="1" value="30" class="glass-input">
       </div>
 
-      <br>
-      <button class="btn btn-primary" onclick="startWorkout()">Start</button>
+      <div class="mt-6">
+        <button class="glass-btn glass-btn-primary" onclick="startWorkout()">Start</button>
+      </div>
     </div>
 
     <!-- Rep Screen -->
     <div id="rep-screen" class="screen">
       <div class="rep-info" id="rep-info"></div>
-      <div class="rep-buttons">
-        <button class="btn btn-done" onclick="doneRep()">Done</button>
-        <button class="btn btn-restart" onclick="restart()">Back to Start</button>
+      <div class="btn-group">
+        <button class="glass-btn glass-btn-done" onclick="doneRep()">Done</button>
+        <button class="glass-btn" onclick="restart()">Back to Start</button>
       </div>
     </div>
 
@@ -270,9 +367,9 @@
         </svg>
         <div class="timer-text" id="exercise-timer-text"></div>
       </div>
-      <div class="rep-buttons">
-        <button class="btn btn-start-exercise" id="exercise-start-btn" onclick="startExercise()">Start</button>
-        <button class="btn btn-restart" onclick="restart()">Back to Start</button>
+      <div class="btn-group">
+        <button class="glass-btn glass-btn-exercise" id="exercise-start-btn" onclick="startExercise()">Start</button>
+        <button class="glass-btn" onclick="restart()">Back to Start</button>
       </div>
     </div>
 
@@ -286,17 +383,17 @@
         </svg>
         <div class="timer-text" id="rest-timer-text"></div>
       </div>
-      <div class="rest-buttons">
-        <button class="btn btn-primary" onclick="skipRest()">Skip Rest</button>
+      <div class="btn-group">
+        <button class="glass-btn glass-btn-primary" onclick="skipRest()">Skip Rest</button>
       </div>
     </div>
 
     <!-- Final Screen -->
     <div id="final-screen" class="screen">
       <div class="title">Workout Complete!</div>
-      <div class="final-subtitle" id="final-summary"></div>
-      <div class="rest-buttons">
-        <button class="btn btn-restart" onclick="restart()">Start Over</button>
+      <div class="final-subtitle text-center" id="final-summary"></div>
+      <div class="btn-group">
+        <button class="glass-btn" onclick="restart()">Start Over</button>
       </div>
     </div>
   </div>
