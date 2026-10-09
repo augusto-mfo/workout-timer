@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workout Timer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #1a1a2e;
+      color: #eee;
+    }
+
+    .container {
+      text-align: center;
+      padding: 2rem;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .title {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin-bottom: 1.5rem;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+      color: #aaa;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 0.75rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #16213e;
+      color: #eee;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #0f3460;
+    }
+
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: filter 0.2s;
+    }
+
+    .btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn:active {
+      filter: brightness(0.95);
+    }
+
+    .btn-primary {
+      background: #0f3460;
+      color: #eee;
+    }
+
+    .btn-done {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .btn-start-exercise {
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .btn-restart {
+      background: #0f3460;
+      color: #eee;
+    }
+
+    .mode-selector {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .mode-btn {
+      font-size: 1.1rem;
+      background: #16213e;
+      color: #aaa;
+      border: 2px solid #333;
+      flex: 1;
+    }
+
+    .mode-btn.active {
+      background: #0f3460;
+      color: #eee;
+      border-color: #0f3460;
+    }
+
+    .mode-btn:hover {
+      background: #1a4a8a;
+      color: #eee;
+    }
+
+    .mode-btn.active:hover {
+      background: #1a4a8a;
+    }
+
+    .mode-section {
+      display: none;
+    }
+
+    .mode-section.active {
+      display: block;
+    }
+
+    .rep-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+    }
+
+    .rep-info {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 2rem;
+    }
+
+    .exercise-info {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .exercise-label {
+      font-size: 1.1rem;
+      color: #aaa;
+      margin-bottom: 0.5rem;
+    }
+
+    .timer-container {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      margin: 2rem auto;
+    }
+
+    .timer-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .timer-bg {
+      fill: none;
+      stroke: #2a2a4a;
+      stroke-width: 10;
+    }
+
+    .timer-progress {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke 0.3s;
+    }
+
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 4rem;
+      font-weight: bold;
+    }
+
+    .rest-buttons {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+    }
+
+    .final-subtitle {
+      font-size: 1.1rem;
+      color: #aaa;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen active">
+      <div class="title">Workout Timer</div>
+      <div class="mode-selector">
+        <button class="btn mode-btn active" onclick="selectMode('reps')">Reps</button>
+        <button class="btn mode-btn" onclick="selectMode('timed')">Timed Exercise</button>
+      </div>
+
+      <!-- Reps Mode -->
+      <div id="reps-section" class="mode-section active">
+        <label for="reps-input">Number of Reps</label>
+        <input type="number" id="reps-input" min="1" value="10">
+        <label for="rest-input">Rest Between Reps (seconds)</label>
+        <input type="number" id="rest-input" min="1" value="30">
+      </div>
+
+      <!-- Timed Exercise Mode -->
+      <div id="timed-section" class="mode-section">
+        <label for="sets-input">Number of Sets</label>
+        <input type="number" id="sets-input" min="1" value="5">
+        <label for="hold-input">Hold Time (seconds)</label>
+        <input type="number" id="hold-input" min="1" value="30">
+        <label for="timed-rest-input">Rest Between Sets (seconds)</label>
+        <input type="number" id="timed-rest-input" min="1" value="30">
+      </div>
+
+      <br>
+      <button class="btn btn-primary" onclick="startWorkout()">Start</button>
+    </div>
+
+    <!-- Rep Screen -->
+    <div id="rep-screen" class="screen">
+      <div class="rep-info" id="rep-info"></div>
+      <div class="rep-buttons">
+        <button class="btn btn-done" onclick="doneRep()">Done</button>
+        <button class="btn btn-restart" onclick="restart()">Back to Start</button>
+      </div>
+    </div>
+
+    <!-- Exercise Timer Screen -->
+    <div id="exercise-screen" class="screen">
+      <div class="exercise-label" id="exercise-label"></div>
+      <div class="exercise-info" id="exercise-set-info"></div>
+      <div class="timer-container">
+        <svg class="timer-svg" viewBox="0 0 200 200">
+          <circle class="timer-bg" cx="100" cy="100" r="80"></circle>
+          <circle class="timer-progress" id="exercise-timer-circle" cx="100" cy="100" r="80"></circle>
+        </svg>
+        <div class="timer-text" id="exercise-timer-text"></div>
+      </div>
+      <div class="rep-buttons">
+        <button class="btn btn-start-exercise" id="exercise-start-btn" onclick="startExercise()">Start</button>
+        <button class="btn btn-restart" onclick="restart()">Back to Start</button>
+      </div>
+    </div>
+
+    <!-- Rest Timer Screen -->
+    <div id="rest-screen" class="screen">
+      <div class="title">Rest</div>
+      <div class="timer-container">
+        <svg class="timer-svg" viewBox="0 0 200 200">
+          <circle class="timer-bg" cx="100" cy="100" r="80"></circle>
+          <circle class="timer-progress" id="rest-timer-circle" cx="100" cy="100" r="80"></circle>
+        </svg>
+        <div class="timer-text" id="rest-timer-text"></div>
+      </div>
+      <div class="rest-buttons">
+        <button class="btn btn-primary" onclick="skipRest()">Skip Rest</button>
+      </div>
+    </div>
+
+    <!-- Final Screen -->
+    <div id="final-screen" class="screen">
+      <div class="title">Workout Complete!</div>
+      <div class="final-subtitle" id="final-summary"></div>
+      <div class="rest-buttons">
+        <button class="btn btn-restart" onclick="restart()">Start Over</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var workoutMode = 'reps';
+    var totalReps = 0;
+    var totalSets = 0;
+    var currentRep = 0;
+    var currentSet = 0;
+    var restSeconds = 0;
+    var holdSeconds = 0;
+    var restInterval = null;
+    var exerciseInterval = null;
+    var exerciseRunning = false;
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(function(s) {
+        s.classList.remove('active');
+      });
+      document.getElementById(id).classList.add('active');
+    }
+
+    function selectMode(mode) {
+      workoutMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      document.querySelectorAll('.mode-section').forEach(function(sec) {
+        sec.classList.remove('active');
+      });
+      if (mode === 'reps') {
+        document.querySelectorAll('.mode-btn')[0].classList.add('active');
+        document.getElementById('reps-section').classList.add('active');
+      } else {
+        document.querySelectorAll('.mode-btn')[1].classList.add('active');
+        document.getElementById('timed-section').classList.add('active');
+      }
+    }
+
+    function startWorkout() {
+      if (workoutMode === 'reps') {
+        totalReps = parseInt(document.getElementById('reps-input').value, 10);
+        restSeconds = parseInt(document.getElementById('rest-input').value, 10);
+
+        if (!totalReps || totalReps < 1) {
+          alert('Please enter a valid number of reps.');
+          return;
+        }
+        if (!restSeconds || restSeconds < 1) {
+          alert('Please enter a valid rest duration.');
+          return;
+        }
+
+        currentRep = 1;
+        showRepScreen();
+      } else {
+        totalSets = parseInt(document.getElementById('sets-input').value, 10);
+        holdSeconds = parseInt(document.getElementById('hold-input').value, 10);
+        restSeconds = parseInt(document.getElementById('timed-rest-input').value, 10);
+
+        if (!totalSets || totalSets < 1) {
+          alert('Please enter a valid number of sets.');
+          return;
+        }
+        if (!holdSeconds || holdSeconds < 1) {
+          alert('Please enter a valid hold time.');
+          return;
+        }
+        if (!restSeconds || restSeconds < 1) {
+          alert('Please enter a valid rest duration.');
+          return;
+        }
+
+        currentSet = 1;
+        showExerciseScreen();
+      }
+    }
+
+    // --- Reps Mode ---
+
+    function showRepScreen() {
+      document.getElementById('rep-info').textContent =
+        'Rep ' + currentRep + ' of ' + totalReps;
+      showScreen('rep-screen');
+    }
+
+    function doneRep() {
+      if (currentRep >= totalReps) {
+        showFinalScreen();
+        return;
+      }
+      startRestTimer();
+    }
+
+    // --- Timed Exercise Mode ---
+
+    function showExerciseScreen() {
+      document.getElementById('exercise-label').textContent = 'Hold';
+      document.getElementById('exercise-set-info').textContent =
+        'Set ' + currentSet + ' of ' + totalSets;
+      document.getElementById('exercise-timer-text').textContent = holdSeconds;
+      document.getElementById('exercise-start-btn').style.display = 'block';
+      exerciseRunning = false;
+
+      var circle = document.getElementById('exercise-timer-circle');
+      circle.style.strokeDasharray = '';
+      circle.style.strokeDashoffset = '';
+      circle.style.stroke = '';
+
+      showScreen('exercise-screen');
+    }
+
+    function startExercise() {
+      document.getElementById('exercise-start-btn').style.display = 'none';
+      exerciseRunning = true;
+
+      var remaining = holdSeconds;
+      var circumference = 2 * Math.PI * 80;
+      var circle = document.getElementById('exercise-timer-circle');
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = 0;
+      circle.style.stroke = '#22c55e';
+      document.getElementById('exercise-timer-text').textContent = remaining;
+
+      if (exerciseInterval) clearInterval(exerciseInterval);
+      exerciseInterval = setInterval(function() {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(exerciseInterval);
+          exerciseInterval = null;
+          exerciseRunning = false;
+          if (currentSet >= totalSets) {
+            showFinalScreen();
+          } else {
+            startRestTimer();
+          }
+        } else {
+          var percentage = remaining / holdSeconds;
+          var offset = circumference * (1 - percentage);
+          circle.style.strokeDashoffset = offset;
+          circle.style.stroke = getTimerColor(percentage * 100);
+          document.getElementById('exercise-timer-text').textContent = remaining;
+        }
+      }, 1000);
+    }
+
+    // --- Rest Timer ---
+
+    function getTimerColor(percentage) {
+      var r, g, b;
+      if (percentage > 66) {
+        var t = (100 - percentage) / 34;
+        r = Math.round(34 * (1 - t) + 255 * t);
+        g = Math.round(211 * (1 - t) + 255 * t);
+        b = Math.round(34);
+      } else if (percentage > 33) {
+        var t = (66 - percentage) / 33;
+        r = Math.round(255);
+        g = Math.round(255 * (1 - t) + 128 * t);
+        b = Math.round(34);
+      } else {
+        var t = (33 - percentage) / 33;
+        r = Math.round(255);
+        g = Math.round(128 * (1 - t));
+        b = Math.round(34);
+      }
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
+    function startRestTimer() {
+      var remaining = restSeconds;
+      var circumference = 2 * Math.PI * 80;
+      var circle = document.getElementById('rest-timer-circle');
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = 0;
+      circle.style.stroke = '#22c55e';
+      document.getElementById('rest-timer-text').textContent = remaining;
+      showScreen('rest-screen');
+
+      if (restInterval) clearInterval(restInterval);
+      restInterval = setInterval(function() {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(restInterval);
+          restInterval = null;
+          currentRep++;
+          currentSet++;
+          if (workoutMode === 'reps') {
+            showRepScreen();
+          } else {
+            showExerciseScreen();
+          }
+        } else {
+          var percentage = remaining / restSeconds;
+          var offset = circumference * (1 - percentage);
+          circle.style.strokeDashoffset = offset;
+          circle.style.stroke = getTimerColor(percentage * 100);
+          document.getElementById('rest-timer-text').textContent = remaining;
+        }
+      }, 1000);
+    }
+
+    function skipRest() {
+      if (restInterval) {
+        clearInterval(restInterval);
+        restInterval = null;
+      }
+      currentRep++;
+      currentSet++;
+      if (workoutMode === 'reps') {
+        showRepScreen();
+      } else {
+        showExerciseScreen();
+      }
+    }
+
+    // --- Final Screen ---
+
+    function showFinalScreen() {
+      if (workoutMode === 'reps') {
+        document.getElementById('final-summary').textContent =
+          'You completed ' + totalReps + ' reps with ' + restSeconds + 's rest between each.';
+      } else {
+        document.getElementById('final-summary').textContent =
+          'You completed ' + totalSets + ' sets of ' + holdSeconds + 's holds with ' + restSeconds + 's rest between each.';
+      }
+      showScreen('final-screen');
+    }
+
+    function restart() {
+      if (restInterval) {
+        clearInterval(restInterval);
+        restInterval = null;
+      }
+      if (exerciseInterval) {
+        clearInterval(exerciseInterval);
+        exerciseInterval = null;
+      }
+      exerciseRunning = false;
+      currentRep = 0;
+      currentSet = 0;
+      showScreen('setup-screen');
+    }
+  </script>
+</body>
+</html>
