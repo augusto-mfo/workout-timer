@@ -482,10 +482,6 @@
     }
 
     function doneRep() {
-      if (currentRep >= totalReps) {
-        showFinalScreen();
-        return;
-      }
       startRestTimer();
     }
 
@@ -526,11 +522,7 @@
           clearInterval(exerciseInterval);
           exerciseInterval = null;
           exerciseRunning = false;
-          if (currentSet >= totalSets) {
-            showFinalScreen();
-          } else {
-            startRestTimer();
-          }
+          startRestTimer();
         } else {
           var percentage = remaining / holdSeconds;
           var offset = circumference * (1 - percentage);
@@ -580,13 +572,7 @@
         if (remaining <= 0) {
           clearInterval(restInterval);
           restInterval = null;
-          currentRep++;
-          currentSet++;
-          if (workoutMode === 'reps') {
-            showRepScreen();
-          } else {
-            showExerciseScreen();
-          }
+          finishRest();
         } else {
           var percentage = remaining / restSeconds;
           var offset = circumference * (1 - percentage);
@@ -602,11 +588,25 @@
         clearInterval(restInterval);
         restInterval = null;
       }
-      currentRep++;
-      currentSet++;
+      finishRest();
+    }
+
+    // After the rest ends (or is skipped): go to the final screen if that
+    // was the last rep/set, otherwise advance to the next one.
+    function finishRest() {
       if (workoutMode === 'reps') {
+        if (currentRep >= totalReps) {
+          showFinalScreen();
+          return;
+        }
+        currentRep++;
         showRepScreen();
       } else {
+        if (currentSet >= totalSets) {
+          showFinalScreen();
+          return;
+        }
+        currentSet++;
         showExerciseScreen();
       }
     }
