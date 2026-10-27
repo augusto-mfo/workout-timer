@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 // ── Types ──
 type WorkoutMode = 'reps' | 'timed'
@@ -18,6 +18,7 @@ interface Exercise {
   sets?: number
   holdTime?: number
   restBetweenSets?: number
+  load?: string // free text, optional (e.g. "10 x 2", "12 kg")
 }
 
 // ── SVG Timer Constants ──
@@ -53,20 +54,17 @@ function loadExercises(): Exercise[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed)
-      ? parsed.filter((e) => e && typeof e.id === 'string' && typeof e.name === 'string' && (e.type === 'reps' || e.type === 'timed'))
-      : []
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((e) => e && typeof e.id === 'string' && typeof e.name === 'string' && (e.type === 'reps' || e.type === 'timed'))
+      .map(({ weight, ...e }) => ({
+        ...e,
+        // migrate the old numeric `weight` field
+        load: typeof e.load === 'string' ? e.load : typeof weight === 'number' ? `${weight} kg` : undefined,
+      }))
   } catch {
     return []
   }
-}
-
-function validate(value: number, name: string): boolean {
-  if (!value || value < 1) {
-    alert(`Please enter a valid ${name}.`)
-    return false
-  }
-  return true
 }
 
 // ── SVG Timer Component (reusable for exercise & rest) ──
@@ -114,7 +112,43 @@ function SVGTimer({
   )
 }
 
-const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) => e.target.select()
+const formatSeconds = (v: number) =>
+  v < 60 ? `${v} s` : `${Math.floor(v / 60)} min${v % 60 ? ` ${v % 60} s` : ''}`
+
+// ── Slider (label + live value + range input) ──
+function Slider({
+  id, label, value, min, max, step = 1, format, onChange,
+}: {
+  id: string
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  format: (v: number) => string
+  onChange: (v: number) => void
+}) {
+  const pct = ((value - min) / (max - min)) * 100
+  return (
+    <div className="field">
+      <div className="slider-head">
+        <label htmlFor={id} className="section-label">{label}</label>
+        <output htmlFor={id} className="slider-value">{format(value)}</output>
+      </div>
+      <input
+        id={id}
+        type="range"
+        className="slider"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        style={{ '--pct': `${pct}%` } as React.CSSProperties}
+        onChange={e => onChange(Number(e.target.value))}
+      />
+    </div>
+  )
+}
 
 // ── Main App Component ──
 export default function App() {
@@ -142,35 +176,13 @@ export default function App() {
     }
   }, [routine.exercises])
 
-  // Last-used values (persisted across restarts)
-  const [lastReps, setLastReps] = useState(10)
-  const [lastRest, setLastRest] = useState(30)
-  const [lastSets, setLastSets] = useState(5)
-  const [lastHold, setLastHold] = useState(30)
-  const [lastTimedRest, setLastTimedRest] = useState(30)
-
-  // Input refs
-  const repsRef = useRef<HTMLInputElement>(null)
-  const restRef = useRef<HTMLInputElement>(null)
-  const setsRef = useRef<HTMLInputElement>(null)
-  const holdRef = useRef<HTMLInputElement>(null)
-  const timedRestRef = useRef<HTMLInputElement>(null)
-  const exerciseNameRef = useRef<HTMLInputElement>(null)
-
-  const getNum = (el: HTMLInputElement | null, fallback = 0) =>
-    parseInt(el?.value ?? String(fallback), 10)
-
-  // Restore input values from last-used state (or defaults on first load)
-  const restoreInputs = useCallback(() => {
-    if (mode === 'reps') {
-      if (repsRef.current) repsRef.current.value = String(lastReps)
-      if (restRef.current) restRef.current.value = String(lastRest)
-    } else {
-      if (setsRef.current) setsRef.current.value = String(lastSets)
-      if (holdRef.current) holdRef.current.value = String(lastHold)
-      if (timedRestRef.current) timedRestRef.current.value = String(lastTimedRest)
-    }
-  }, [mode, lastReps, lastRest, lastSets, lastHold, lastTimedRest])
+  // Setup form (controlled, so sliders can show live values)
+  const [name, setName] = useState('')
+  const [load, setLoad] = useState('')
+  const [form, setForm] = useState({ reps: 10, rest: 30, sets: 5, hold: 30, timedRest: 30 })
+  const setField = (key: keyof typeof form) => (value: number) => setForm(f => ({ ...f, [key]: value }))
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const [singleLoad, setSingleLoad] = useState<string | undefined>(undefined)
 
   // Timer state
   const [exerciseRemaining, setExerciseRemaining] = useState(0)
@@ -198,61 +210,30 @@ export default function App() {
     }
   }, [])
 
-  // ── Initialize input values on mount ──
-  useEffect(() => {
-    restoreInputs()
-  }, [restoreInputs])
-
   // ── Mode Selection ──
   const selectMode = (m: WorkoutMode) => setMode(m)
 
   // ── Routine Management ──
   const addExercise = () => {
-    const name = exerciseNameRef.current?.value.trim() ?? ''
-    if (!name) {
+    const trimmed = name.trim()
+    if (!trimmed) {
       alert('Please enter an exercise name.')
+      nameInputRef.current?.focus()
       return
     }
 
-    let newExercise: Exercise
-    if (mode === 'reps') {
-      const reps = getNum(repsRef.current, 10)
-      const rest = getNum(restRef.current, 30)
-      if (!validate(reps, 'reps') || !validate(rest, 'rest')) return
-      newExercise = {
-        id: Date.now().toString(),
-        name,
-        type: 'reps',
-        reps,
-        restBetweenReps: rest,
-      }
-    } else {
-      const sets = getNum(setsRef.current, 5)
-      const hold = getNum(holdRef.current, 30)
-      const rest = getNum(timedRestRef.current, 30)
-      if (!validate(sets, 'sets') || !validate(hold, 'hold time') || !validate(rest, 'rest')) return
-      newExercise = {
-        id: Date.now().toString(),
-        name,
-        type: 'timed',
-        sets,
-        holdTime: hold,
-        restBetweenSets: rest,
-      }
-    }
+    const base = { id: Date.now().toString(), name: trimmed, load: load.trim() || undefined }
+    const newExercise: Exercise =
+      mode === 'reps'
+        ? { ...base, type: 'reps', reps: form.reps, restBetweenReps: form.rest }
+        : { ...base, type: 'timed', sets: form.sets, holdTime: form.hold, restBetweenSets: form.timedRest }
 
     setRoutine(prev => ({ ...prev, exercises: [...prev.exercises, newExercise] }))
 
-    // Reset the form after adding
-    if (exerciseNameRef.current) exerciseNameRef.current.value = ''
-    if (mode === 'reps') {
-      if (repsRef.current) repsRef.current.value = '10'
-      if (restRef.current) restRef.current.value = '30'
-    } else {
-      if (setsRef.current) setsRef.current.value = '5'
-      if (holdRef.current) holdRef.current.value = '30'
-      if (timedRestRef.current) timedRestRef.current.value = '30'
-    }
+    // Clear the text fields; keep the slider values since consecutive exercises are often similar
+    setName('')
+    setLoad('')
+    nameInputRef.current?.focus()
   }
 
   const removeExercise = (id: string) => {
@@ -314,32 +295,20 @@ export default function App() {
   // ── Start Single Workout (uses the form values directly) ──
   const startWorkout = () => {
     stopTimer()
+    setSingleLoad(load.trim() || undefined)
     setRoutine(prev => ({ ...prev, isRunning: false, currentExerciseIndex: 0 }))
     setActiveType(mode)
     setExerciseRunning(false)
+    setCurrent(1)
     if (mode === 'reps') {
-      const repsVal = getNum(repsRef.current, 10)
-      const restVal = getNum(restRef.current, 30)
-      if (!validate(repsVal, 'reps') || !validate(restVal, 'rest')) return
-      setTotal(repsVal)
-      setRestSeconds(restVal)
-      setLastReps(repsVal)
-      setLastRest(restVal)
-      setCurrent(1)
+      setTotal(form.reps)
+      setRestSeconds(form.rest)
       setScreen('rep')
     } else {
-      const setsVal = getNum(setsRef.current, 5)
-      const holdVal = getNum(holdRef.current, 30)
-      const timedRestVal = getNum(timedRestRef.current, 30)
-      if (!validate(setsVal, 'sets') || !validate(holdVal, 'hold time') || !validate(timedRestVal, 'rest')) return
-      setTotal(setsVal)
-      setHoldSeconds(holdVal)
-      setRestSeconds(timedRestVal)
-      setLastSets(setsVal)
-      setLastHold(holdVal)
-      setLastTimedRest(timedRestVal)
-      setCurrent(1)
-      setExerciseRemaining(holdVal)
+      setTotal(form.sets)
+      setHoldSeconds(form.hold)
+      setRestSeconds(form.timedRest)
+      setExerciseRemaining(form.hold)
       setScreen('exercise')
     }
   }
@@ -442,21 +411,16 @@ export default function App() {
     setRoutine(prev => ({ ...prev, isRunning: false, currentExerciseIndex: 0 }))
   }
 
-  // ── Restore inputs when switching to setup screen ──
-  useEffect(() => {
-    if (screen === 'setup') {
-      restoreInputs()
-    }
-  }, [screen, restoreInputs])
-
   // ── Render Helpers ──
   const isExerciseActive = screen === 'exercise' && exerciseRunning
 
   // ── Render ──
+  const plural = (n: number | undefined, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
   const exerciseSummary = (ex: Exercise) =>
-    ex.type === 'reps'
-      ? `${ex.reps} reps · ${ex.restBetweenReps}s rest`
-      : `${ex.sets} sets · ${ex.holdTime}s hold · ${ex.restBetweenSets}s rest`
+    (ex.type === 'reps'
+      ? `${plural(ex.reps, 'rep')} · ${formatSeconds(ex.restBetweenReps ?? 0)} rest`
+      : `${plural(ex.sets, 'set')} · ${formatSeconds(ex.holdTime ?? 0)} hold · ${formatSeconds(ex.restBetweenSets ?? 0)} rest`) +
+    (ex.load ? ` · ${ex.load}` : '')
 
   const count = routine.exercises.length
   const exercisesLabel = `${count} exercise${count === 1 ? '' : 's'}`
@@ -476,12 +440,16 @@ export default function App() {
     return 'Finish'
   })()
 
+  const runLoad = routine.isRunning ? currentEx?.load : singleLoad
   const runHeader = (
     <div style={{ marginBottom: '0.5rem' }}>
       <div className="run-name">{routine.isRunning ? currentEx?.name : 'Single workout'}</div>
       {routine.isRunning && (
+        <div className="run-sub">Exercise {routine.currentExerciseIndex + 1} of {count}</div>
+      )}
+      {runLoad && <div className="run-load">Load · {runLoad}</div>}
+      {routine.isRunning && (
         <>
-          <div className="run-sub">Exercise {routine.currentExerciseIndex + 1} of {count}</div>
           <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct}>
             <div className="progress-bar" style={{ width: `${progressPct}%` }} />
           </div>
@@ -495,81 +463,96 @@ export default function App() {
       {/* Glow Orbs */}
       <div className="glow-orb glow-orb-1" />
       <div className="glow-orb glow-orb-2" />
-      <div className="glow-orb glow-orb-3" />
+
+      <header className="app-header">
+        <h1>Simple Workout App</h1>
+      </header>
 
       <div className="layout">
         {/* ── Left Panel: add-exercise form (setup) / progress (running) ── */}
         <aside className="glass panel panel-left">
           {screen === 'setup' ? (
             <>
-              <h2 className="panel-title">Add Exercise</h2>
-              <div
-                className="form"
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') addExercise()
-                }}
-              >
-                <div className="mode-selector" role="group" aria-label="Exercise type">
-                  <button className={`mode-btn ${mode === 'reps' ? 'active' : ''}`} aria-pressed={mode === 'reps'} onClick={() => selectMode('reps')}>
-                    Reps
-                  </button>
-                  <button className={`mode-btn ${mode === 'timed' ? 'active' : ''}`} aria-pressed={mode === 'timed'} onClick={() => selectMode('timed')}>
-                    Timed
-                  </button>
-                </div>
+              <div className="panel-body">
+                <h2 className="panel-title">Add Exercise</h2>
+                <div
+                  className="form"
+                  onKeyDown={e => {
+                    const t = e.target as HTMLInputElement
+                    if (e.key === 'Enter' && t.tagName === 'INPUT' && t.type === 'text') addExercise()
+                  }}
+                >
+                  <div className="mode-selector" role="group" aria-label="Exercise type">
+                    <button className={`mode-btn ${mode === 'reps' ? 'active' : ''}`} aria-pressed={mode === 'reps'} onClick={() => selectMode('reps')}>
+                      Reps
+                    </button>
+                    <button className={`mode-btn ${mode === 'timed' ? 'active' : ''}`} aria-pressed={mode === 'timed'} onClick={() => selectMode('timed')}>
+                      Timed
+                    </button>
+                  </div>
 
-                <div className="field">
-                  <label htmlFor="exercise-name-input" className="section-label">Exercise name</label>
-                  <input
-                    ref={exerciseNameRef}
-                    type="text"
-                    id="exercise-name-input"
-                    className="glass-input"
-                    placeholder="e.g., Biceps, Plank..."
-                    autoComplete="off"
-                  />
-                </div>
+                  <div className="field">
+                    <label htmlFor="exercise-name-input" className="section-label">Exercise name</label>
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      id="exercise-name-input"
+                      className="glass-input"
+                      placeholder="e.g., Biceps, Plank..."
+                      autoComplete="off"
+                      maxLength={60}
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                    />
+                  </div>
 
-                {/* Reps Mode */}
-                <div className={mode === 'reps' ? 'mode-section active' : 'mode-section'}>
-                  <div className="field">
-                    <label htmlFor="reps-input" className="section-label">Number of reps</label>
-                    <input ref={repsRef} type="number" inputMode="numeric" id="reps-input" min="1" className="glass-input" defaultValue="10" onFocus={selectOnFocus} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="rest-input" className="section-label">Rest between reps (seconds)</label>
-                    <input ref={restRef} type="number" inputMode="numeric" id="rest-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
-                  </div>
-                </div>
+                  {mode === 'reps' ? (
+                    <>
+                      <Slider id="reps-input" label="Number of reps" value={form.reps} min={1} max={50}
+                        format={v => `${v} ${v === 1 ? 'rep' : 'reps'}`} onChange={setField('reps')} />
+                      <Slider id="rest-input" label="Rest between reps" value={form.rest} min={5} max={120} step={5}
+                        format={formatSeconds} onChange={setField('rest')} />
+                    </>
+                  ) : (
+                    <>
+                      <Slider id="sets-input" label="Number of sets" value={form.sets} min={1} max={20}
+                        format={v => `${v} ${v === 1 ? 'set' : 'sets'}`} onChange={setField('sets')} />
+                      <Slider id="hold-input" label="Hold time" value={form.hold} min={5} max={180} step={5}
+                        format={formatSeconds} onChange={setField('hold')} />
+                      <Slider id="timed-rest-input" label="Rest between sets" value={form.timedRest} min={5} max={180} step={5}
+                        format={formatSeconds} onChange={setField('timedRest')} />
+                    </>
+                  )}
 
-                {/* Timed Exercise Mode */}
-                <div className={mode === 'timed' ? 'mode-section active' : 'mode-section'}>
                   <div className="field">
-                    <label htmlFor="sets-input" className="section-label">Number of sets</label>
-                    <input ref={setsRef} type="number" inputMode="numeric" id="sets-input" min="1" className="glass-input" defaultValue="5" onFocus={selectOnFocus} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="hold-input" className="section-label">Hold time (seconds)</label>
-                    <input ref={holdRef} type="number" inputMode="numeric" id="hold-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="timed-rest-input" className="section-label">Rest between sets (seconds)</label>
-                    <input ref={timedRestRef} type="number" inputMode="numeric" id="timed-rest-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
+                    <label htmlFor="load-input" className="section-label">
+                      Load <span className="optional">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="load-input"
+                      className="glass-input"
+                      placeholder="e.g., 10 x 2, 12 kg, bodyweight"
+                      autoComplete="off"
+                      maxLength={40}
+                      value={load}
+                      onChange={e => setLoad(e.target.value)}
+                    />
                   </div>
                 </div>
+              </div>
 
-                <div className="stack">
-                  <button className="glass-btn glass-btn-primary" onClick={addExercise}>
-                    + Add to Routine
-                  </button>
-                  <button className="glass-btn glass-btn-ghost" onClick={startWorkout}>
-                    Just run this one now
-                  </button>
-                </div>
+              <div className="panel-footer">
+                <button className="glass-btn glass-btn-primary" onClick={addExercise}>
+                  + Add to Routine
+                </button>
+                <button className="glass-btn glass-btn-ghost" onClick={startWorkout}>
+                  Just run this one now
+                </button>
               </div>
             </>
           ) : (
-            <>
+            <div className="panel-body">
               <h2 className="panel-title">Routine</h2>
               {routine.isRunning ? (
                 <ol className="ex-list">
@@ -591,7 +574,7 @@ export default function App() {
               ) : (
                 <p className="muted">{screen === 'final' ? 'Workout complete.' : 'Single workout in progress.'}</p>
               )}
-            </>
+            </div>
           )}
         </aside>
 
