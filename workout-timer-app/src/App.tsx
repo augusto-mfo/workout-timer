@@ -3,13 +3,21 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 // ── Types ──
 type WorkoutMode = 'reps' | 'timed'
 type ScreenId = 'setup' | 'rep' | 'exercise' | 'rest' | 'final'
+type RoutineState = {
+  exercises: Exercise[]
+  currentExerciseIndex: number
+  isRunning: boolean
+}
 
-interface WorkoutState {
-  mode: WorkoutMode
-  total: number
-  current: number
-  restSeconds: number
-  holdSeconds: number
+interface Exercise {
+  id: string
+  name: string
+  type: WorkoutMode
+  reps?: number
+  restBetweenReps?: number
+  sets?: number
+  holdTime?: number
+  restBetweenSets?: number
 }
 
 // ── SVG Timer Constants ──
@@ -39,6 +47,20 @@ function getTimerColor(percentage: number): string {
 }
 
 // ── Validation ──
+const STORAGE_KEY = 'workout-timer:routine:v1'
+
+function loadExercises(): Exercise[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed)
+      ? parsed.filter((e) => e && typeof e.id === 'string' && typeof e.name === 'string' && (e.type === 'reps' || e.type === 'timed'))
+      : []
+  } catch {
+    return []
+  }
+}
+
 function validate(value: number, name: string): boolean {
   if (!value || value < 1) {
     alert(`Please enter a valid ${name}.`)
@@ -69,7 +91,7 @@ function SVGTimer({
   const color = getTimerColor(percentage * 100)
 
   return (
-    <div className="timer-container">
+    <div className="timer-container" role="timer" aria-label={`${remainingSeconds} seconds remaining`}>
       <svg className="timer-svg" viewBox="0 0 200 200">
         <circle className="timer-bg" cx="100" cy="100" r={CIRCLE_RADIUS} />
         <circle
@@ -92,6 +114,8 @@ function SVGTimer({
   )
 }
 
+const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) => e.target.select()
+
 // ── Main App Component ──
 export default function App() {
   // ── State ──
@@ -101,6 +125,22 @@ export default function App() {
   const [current, setCurrent] = useState(0)
   const [restSeconds, setRestSeconds] = useState(0)
   const [holdSeconds, setHoldSeconds] = useState(0)
+
+  // Routine state
+  const [routine, setRoutine] = useState<RoutineState>(() => ({
+    exercises: loadExercises(),
+    currentExerciseIndex: 0,
+    isRunning: false,
+  }))
+
+  // Keep the routine across page reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(routine.exercises))
+    } catch {
+      /* storage unavailable – ignore */
+    }
+  }, [routine.exercises])
 
   // Last-used values (persisted across restarts)
   const [lastReps, setLastReps] = useState(10)
@@ -115,6 +155,7 @@ export default function App() {
   const setsRef = useRef<HTMLInputElement>(null)
   const holdRef = useRef<HTMLInputElement>(null)
   const timedRestRef = useRef<HTMLInputElement>(null)
+  const exerciseNameRef = useRef<HTMLInputElement>(null)
 
   const getNum = (el: HTMLInputElement | null, fallback = 0) =>
     parseInt(el?.value ?? String(fallback), 10)
@@ -137,18 +178,23 @@ export default function App() {
   const [exerciseRunning, setExerciseRunning] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Refs for current/total to avoid stale closures in interval callbacks
+  // Type of the exercise currently being run (independent from the setup form's `mode`)
+  const [activeType, setActiveType] = useState<WorkoutMode>('reps')
+
+  // Refs to avoid stale closures in interval callbacks
   const currentRef = useRef(current)
   const totalRef = useRef(total)
-  const modeRef = useRef(mode)
-  useEffect(() => { currentRef.current = current }, [current])
-  useEffect(() => { totalRef.current = total }, [total])
-  useEffect(() => { modeRef.current = mode }, [mode])
+  const activeTypeRef = useRef(activeType)
+  const routineRef = useRef(routine)
+  currentRef.current = current
+  totalRef.current = total
+  activeTypeRef.current = activeType
+  routineRef.current = routine
 
   // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current!)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
 
@@ -157,18 +203,120 @@ export default function App() {
     restoreInputs()
   }, [restoreInputs])
 
-  // ── Screen Navigation ──
-  const showScreen = useCallback((id: ScreenId) => {
-    setScreen(id)
-  }, [])
-
   // ── Mode Selection ──
-  const selectMode = useCallback((m: WorkoutMode) => {
-    setMode(m)
-  }, [])
+  const selectMode = (m: WorkoutMode) => setMode(m)
 
-  // ── Start Workout ──
-  const startWorkout = useCallback(() => {
+  // ── Routine Management ──
+  const addExercise = () => {
+    const name = exerciseNameRef.current?.value.trim() ?? ''
+    if (!name) {
+      alert('Please enter an exercise name.')
+      return
+    }
+
+    let newExercise: Exercise
+    if (mode === 'reps') {
+      const reps = getNum(repsRef.current, 10)
+      const rest = getNum(restRef.current, 30)
+      if (!validate(reps, 'reps') || !validate(rest, 'rest')) return
+      newExercise = {
+        id: Date.now().toString(),
+        name,
+        type: 'reps',
+        reps,
+        restBetweenReps: rest,
+      }
+    } else {
+      const sets = getNum(setsRef.current, 5)
+      const hold = getNum(holdRef.current, 30)
+      const rest = getNum(timedRestRef.current, 30)
+      if (!validate(sets, 'sets') || !validate(hold, 'hold time') || !validate(rest, 'rest')) return
+      newExercise = {
+        id: Date.now().toString(),
+        name,
+        type: 'timed',
+        sets,
+        holdTime: hold,
+        restBetweenSets: rest,
+      }
+    }
+
+    setRoutine(prev => ({ ...prev, exercises: [...prev.exercises, newExercise] }))
+
+    // Reset the form after adding
+    if (exerciseNameRef.current) exerciseNameRef.current.value = ''
+    if (mode === 'reps') {
+      if (repsRef.current) repsRef.current.value = '10'
+      if (restRef.current) restRef.current.value = '30'
+    } else {
+      if (setsRef.current) setsRef.current.value = '5'
+      if (holdRef.current) holdRef.current.value = '30'
+      if (timedRestRef.current) timedRestRef.current.value = '30'
+    }
+  }
+
+  const removeExercise = (id: string) => {
+    setRoutine(prev => ({ ...prev, exercises: prev.exercises.filter(e => e.id !== id) }))
+  }
+
+  const moveExercise = (index: number, direction: -1 | 1) => {
+    setRoutine(prev => {
+      const target = index + direction
+      if (target < 0 || target >= prev.exercises.length) return prev
+      const exercises = [...prev.exercises]
+      ;[exercises[index], exercises[target]] = [exercises[target], exercises[index]]
+      return { ...prev, exercises }
+    })
+  }
+
+  const clearAllExercises = () => {
+    if (routine.exercises.length > 1 && !window.confirm('Remove all exercises from the routine?')) return
+    setRoutine(prev => ({ ...prev, exercises: [] }))
+  }
+
+  const stopTimer = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  // ── Load one exercise from the routine into the workout screens ──
+  const beginExercise = (ex: Exercise, index: number) => {
+    stopTimer()
+    setActiveType(ex.type)
+    setExerciseRunning(false)
+    setRoutine(prev => ({ ...prev, currentExerciseIndex: index, isRunning: true }))
+    setCurrent(1)
+    if (ex.type === 'reps') {
+      setTotal(ex.reps ?? 10)
+      setRestSeconds(ex.restBetweenReps ?? 30)
+      setScreen('rep')
+    } else {
+      const hold = ex.holdTime ?? 30
+      setTotal(ex.sets ?? 5)
+      setHoldSeconds(hold)
+      setRestSeconds(ex.restBetweenSets ?? 30)
+      setExerciseRemaining(hold)
+      setScreen('exercise')
+    }
+  }
+
+  // ── Start Routine ──
+  const startRoutine = () => {
+    if (routine.exercises.length === 0) {
+      alert('Please add at least one exercise to the routine.')
+      return
+    }
+    beginExercise(routine.exercises[0], 0)
+  }
+
+  // ── Start Single Workout (uses the form values directly) ──
+  const startWorkout = () => {
+    stopTimer()
+    setRoutine(prev => ({ ...prev, isRunning: false, currentExerciseIndex: 0 }))
+    setActiveType(mode)
+    setExerciseRunning(false)
     if (mode === 'reps') {
       const repsVal = getNum(repsRef.current, 10)
       const restVal = getNum(restRef.current, 30)
@@ -178,17 +326,12 @@ export default function App() {
       setLastReps(repsVal)
       setLastRest(restVal)
       setCurrent(1)
-      showScreen('rep')
+      setScreen('rep')
     } else {
       const setsVal = getNum(setsRef.current, 5)
       const holdVal = getNum(holdRef.current, 30)
       const timedRestVal = getNum(timedRestRef.current, 30)
-      if (
-        !validate(setsVal, 'sets') ||
-        !validate(holdVal, 'hold time') ||
-        !validate(timedRestVal, 'rest')
-      )
-        return
+      if (!validate(setsVal, 'sets') || !validate(holdVal, 'hold time') || !validate(timedRestVal, 'rest')) return
       setTotal(setsVal)
       setHoldSeconds(holdVal)
       setRestSeconds(timedRestVal)
@@ -197,114 +340,107 @@ export default function App() {
       setLastTimedRest(timedRestVal)
       setCurrent(1)
       setExerciseRemaining(holdVal)
-      showScreen('exercise')
+      setScreen('exercise')
     }
-  }, [mode, showScreen])
+  }
 
   // ── Countdown Logic ──
-  const startCountdown = useCallback(
-    (
-      totalSec: number,
-      setRemaining: React.Dispatch<React.SetStateAction<number>>,
-      onEnd: () => void
-    ) => {
-      let remaining = totalSec
-      setRemaining(remaining)
+  const startCountdown = (
+    totalSec: number,
+    setRemaining: React.Dispatch<React.SetStateAction<number>>,
+    onEnd: () => void
+  ) => {
+    let remaining = totalSec
+    setRemaining(remaining)
+    stopTimer()
+    intervalRef.current = setInterval(() => {
+      remaining--
+      if (remaining <= 0) {
+        stopTimer()
+        onEnd()
+      } else {
+        setRemaining(remaining)
+      }
+    }, 1000)
+  }
 
-      if (intervalRef.current) clearInterval(intervalRef.current!)
-
-      intervalRef.current = setInterval(() => {
-        remaining--
-        if (remaining <= 0) {
-          clearInterval(intervalRef.current!)
-          intervalRef.current = null
-          onEnd()
-        } else {
-          setRemaining(remaining)
-        }
-      }, 1000)
-    },
-    []
-  )
-
-  // ── Screen Navigation Helpers ──
-  const showRepScreen = useCallback(() => {
-    setScreen('rep')
-  }, [])
-
-  const showExerciseScreen = useCallback(() => {
-    setExerciseRemaining(holdSeconds)
-    setExerciseRunning(false)
-    showScreen('exercise')
-  }, [holdSeconds, showScreen])
+  // ── Move on to next exercise of the routine, or finish ──
+  const goToNextExerciseOrFinish = () => {
+    const r = routineRef.current
+    if (r.isRunning) {
+      const nextIndex = r.currentExerciseIndex + 1
+      if (nextIndex < r.exercises.length) {
+        beginExercise(r.exercises[nextIndex], nextIndex)
+        return
+      }
+    }
+    setScreen('final')
+  }
 
   // ── Rest Timer ──
-  const startRestTimer = useCallback(() => {
+  const startRestTimer = () => {
     setRestRemaining(restSeconds)
-    showScreen('rest')
-    startCountdown(restSeconds, setRestRemaining, finishRest)
-  }, [restSeconds, showScreen, startCountdown])
+    setScreen('rest')
+    // Call through `latest` so the interval never runs a stale finishRest
+    startCountdown(restSeconds, setRestRemaining, () => latest.current.finishRest())
+  }
 
-  const skipRest = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current!)
-      intervalRef.current = null
-    }
-    finishRest()
-  }, [])
-
-  const finishRest = useCallback(() => {
-    if (modeRef.current === 'reps') {
-      // current already incremented in doneRep
+  const finishRest = () => {
+    if (activeTypeRef.current === 'reps') {
+      // `current` was already incremented in doneRep
       if (currentRef.current > totalRef.current) {
-        showFinalScreen()
+        goToNextExerciseOrFinish()
       } else {
-        showRepScreen()
+        setScreen('rep')
       }
     } else {
-      // timed mode: increment here (doneRep not used)
       if (currentRef.current >= totalRef.current) {
-        showFinalScreen()
+        goToNextExerciseOrFinish()
       } else {
         setCurrent(prev => prev + 1)
         setExerciseRunning(false)
-        showExerciseScreen()
+        setExerciseRemaining(holdSeconds)
+        setScreen('exercise')
       }
     }
-  }, [showRepScreen, showExerciseScreen])
+  }
+
+  const skipRest = () => {
+    stopTimer()
+    finishRest()
+  }
+
+  // Always points at the newest closures (used by timers)
+  const latest = useRef({ finishRest, startRestTimer })
+  latest.current = { finishRest, startRestTimer }
 
   // ── Rep Screen ──
-  const doneRep = useCallback(() => {
+  const doneRep = () => {
     setCurrent(prev => prev + 1)
     startRestTimer()
-  }, [startRestTimer])
+  }
 
-  // ── Start Exercise ──
-  const startExercise = useCallback(() => {
+  // ── Start Exercise (timed hold) ──
+  const startExercise = () => {
     setExerciseRunning(true)
-    startCountdown(
-      holdSeconds,
-      setExerciseRemaining,
-      startRestTimer
-    )
-  }, [holdSeconds, startCountdown])
+    startCountdown(holdSeconds, setExerciseRemaining, () => latest.current.startRestTimer())
+  }
 
-  // ── Final Screen ──
-  const showFinalScreen = useCallback(() => {
-    showScreen('final')
-  }, [showScreen])
+  // ── Stop (asks first when a routine is in progress) ──
+  const stopWorkout = () => {
+    if (routine.isRunning && !window.confirm('Stop the routine and go back to setup?')) return
+    restart()
+  }
 
   // ── Restart ──
-  const restart = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current!)
-      intervalRef.current = null
-    }
+  const restart = () => {
+    stopTimer()
     setExerciseRunning(false)
     setCurrent(0)
     setTotal(0)
     setScreen('setup')
-  }, [])
+    setRoutine(prev => ({ ...prev, isRunning: false, currentExerciseIndex: 0 }))
+  }
 
   // ── Restore inputs when switching to setup screen ──
   useEffect(() => {
@@ -317,183 +453,273 @@ export default function App() {
   const isExerciseActive = screen === 'exercise' && exerciseRunning
 
   // ── Render ──
+  const exerciseSummary = (ex: Exercise) =>
+    ex.type === 'reps'
+      ? `${ex.reps} reps · ${ex.restBetweenReps}s rest`
+      : `${ex.sets} sets · ${ex.holdTime}s hold · ${ex.restBetweenSets}s rest`
+
+  const count = routine.exercises.length
+  const exercisesLabel = `${count} exercise${count === 1 ? '' : 's'}`
+  const currentEx = routine.exercises[routine.currentExerciseIndex]
+  const nextEx = routine.exercises[routine.currentExerciseIndex + 1]
+  const progressPct = routine.isRunning && count > 0
+    ? Math.round(((screen === 'final' ? count : routine.currentExerciseIndex) / count) * 100)
+    : 0
+
+  // What comes after the current rest
+  const upNext = (() => {
+    const lastStep = activeType === 'reps' ? current > total : current >= total
+    if (!lastStep) {
+      return activeType === 'reps' ? `Rep ${current} of ${total}` : `Set ${current + 1} of ${total}`
+    }
+    if (routine.isRunning && nextEx) return nextEx.name
+    return 'Finish'
+  })()
+
+  const runHeader = (
+    <div style={{ marginBottom: '0.5rem' }}>
+      <div className="run-name">{routine.isRunning ? currentEx?.name : 'Single workout'}</div>
+      {routine.isRunning && (
+        <>
+          <div className="run-sub">Exercise {routine.currentExerciseIndex + 1} of {count}</div>
+          <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct}>
+            <div className="progress-bar" style={{ width: `${progressPct}%` }} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="app">
       {/* Glow Orbs */}
       <div className="glow-orb glow-orb-1" />
       <div className="glow-orb glow-orb-2" />
       <div className="glow-orb glow-orb-3" />
 
-      <div className="glass p-8 max-w-md w-full">
-        {/* ── Setup Screen ── */}
-        {screen === 'setup' && (
-          <div className="screen active">
-            <div className="title">Workout Timer</div>
-            <div className="mode-selector flex gap-3 mb-6">
-              <button
-                className={`mode-btn ${mode === 'reps' ? 'active' : ''}`}
-                onClick={() => selectMode('reps')}
+      <div className="layout">
+        {/* ── Left Panel: add-exercise form (setup) / progress (running) ── */}
+        <aside className="glass panel panel-left">
+          {screen === 'setup' ? (
+            <>
+              <h2 className="panel-title">Add Exercise</h2>
+              <div
+                className="form"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') addExercise()
+                }}
               >
-                Reps
-              </button>
-              <button
-                className={`mode-btn ${mode === 'timed' ? 'active' : ''}`}
-                onClick={() => selectMode('timed')}
-              >
-                Timed Exercise
-              </button>
-            </div>
+                <div className="mode-selector" role="group" aria-label="Exercise type">
+                  <button className={`mode-btn ${mode === 'reps' ? 'active' : ''}`} aria-pressed={mode === 'reps'} onClick={() => selectMode('reps')}>
+                    Reps
+                  </button>
+                  <button className={`mode-btn ${mode === 'timed' ? 'active' : ''}`} aria-pressed={mode === 'timed'} onClick={() => selectMode('timed')}>
+                    Timed
+                  </button>
+                </div>
 
-            {/* Reps Mode */}
-            <div className={mode === 'reps' ? 'mode-section active' : 'mode-section'}>
-              <label htmlFor="reps-input" className="section-label">
-                Number of Reps
-              </label>
-              <input
-                ref={repsRef}
-                type="number"
-                id="reps-input"
-                min="1"
-                className="glass-input"
-              />
-              <label htmlFor="rest-input" className="section-label">
-                Rest Between Reps (seconds)
-              </label>
-              <input
-                ref={restRef}
-                type="number"
-                id="rest-input"
-                min="1"
-                className="glass-input"
-              />
-            </div>
+                <div className="field">
+                  <label htmlFor="exercise-name-input" className="section-label">Exercise name</label>
+                  <input
+                    ref={exerciseNameRef}
+                    type="text"
+                    id="exercise-name-input"
+                    className="glass-input"
+                    placeholder="e.g., Biceps, Plank..."
+                    autoComplete="off"
+                  />
+                </div>
 
-            {/* Timed Exercise Mode */}
-            <div className={mode === 'timed' ? 'mode-section active' : 'mode-section'}>
-              <label htmlFor="sets-input" className="section-label">
-                Number of Sets
-              </label>
-              <input
-                ref={setsRef}
-                type="number"
-                id="sets-input"
-                min="1"
-                className="glass-input"
-              />
-              <label htmlFor="hold-input" className="section-label">
-                Hold Time (seconds)
-              </label>
-              <input
-                ref={holdRef}
-                type="number"
-                id="hold-input"
-                min="1"
-                className="glass-input"
-              />
-              <label htmlFor="timed-rest-input" className="section-label">
-                Rest Between Sets (seconds)
-              </label>
-              <input
-                ref={timedRestRef}
-                type="number"
-                id="timed-rest-input"
-                min="1"
-                className="glass-input"
-              />
-            </div>
+                {/* Reps Mode */}
+                <div className={mode === 'reps' ? 'mode-section active' : 'mode-section'}>
+                  <div className="field">
+                    <label htmlFor="reps-input" className="section-label">Number of reps</label>
+                    <input ref={repsRef} type="number" inputMode="numeric" id="reps-input" min="1" className="glass-input" defaultValue="10" onFocus={selectOnFocus} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="rest-input" className="section-label">Rest between reps (seconds)</label>
+                    <input ref={restRef} type="number" inputMode="numeric" id="rest-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
+                  </div>
+                </div>
 
-            <div className="mt-6">
-              <button className="glass-btn glass-btn-primary" onClick={startWorkout}>
-                Start
-              </button>
-            </div>
-          </div>
-        )}
+                {/* Timed Exercise Mode */}
+                <div className={mode === 'timed' ? 'mode-section active' : 'mode-section'}>
+                  <div className="field">
+                    <label htmlFor="sets-input" className="section-label">Number of sets</label>
+                    <input ref={setsRef} type="number" inputMode="numeric" id="sets-input" min="1" className="glass-input" defaultValue="5" onFocus={selectOnFocus} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="hold-input" className="section-label">Hold time (seconds)</label>
+                    <input ref={holdRef} type="number" inputMode="numeric" id="hold-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="timed-rest-input" className="section-label">Rest between sets (seconds)</label>
+                    <input ref={timedRestRef} type="number" inputMode="numeric" id="timed-rest-input" min="1" className="glass-input" defaultValue="30" onFocus={selectOnFocus} />
+                  </div>
+                </div>
 
-        {/* ── Rep Screen ── */}
-        {screen === 'rep' && (
-          <div className="screen active">
-            <div className="rep-info">
-              Rep {current} of {total}
-            </div>
-            <div className="btn-group">
-              <button className="glass-btn glass-btn-done" onClick={doneRep}>
-                Done
-              </button>
-              <button className="glass-btn" onClick={restart}>
-                Back to Start
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Exercise Screen ── */}
-        {screen === 'exercise' && (
-          <div className="screen active">
-            <div className="exercise-label">Hold</div>
-            <div className="exercise-info">
-              Set {current} of {total}
-            </div>
-            <SVGTimer
-              totalSeconds={holdSeconds}
-              remainingSeconds={exerciseRemaining}
-              circleId="exercise-timer-circle"
-              textId="exercise-timer-text"
-              onEnd={startRestTimer}
-              active={isExerciseActive}
-            />
-            <div className="btn-group">
-              {!exerciseRunning && (
-                <button
-                  className="glass-btn glass-btn-exercise"
-                  onClick={startExercise}
-                >
-                  Start
-                </button>
+                <div className="stack">
+                  <button className="glass-btn glass-btn-primary" onClick={addExercise}>
+                    + Add to Routine
+                  </button>
+                  <button className="glass-btn glass-btn-ghost" onClick={startWorkout}>
+                    Just run this one now
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="panel-title">Routine</h2>
+              {routine.isRunning ? (
+                <ol className="ex-list">
+                  {routine.exercises.map((exercise, index) => {
+                    const state = screen === 'final' || index < routine.currentExerciseIndex
+                      ? 'done'
+                      : index === routine.currentExerciseIndex ? 'current' : ''
+                    return (
+                      <li key={exercise.id} className={`ex-card ${state}`} aria-current={state === 'current' ? 'step' : undefined}>
+                        <span className="ex-index">{state === 'done' ? '✓' : index + 1}</span>
+                        <div className="ex-body">
+                          <div className="ex-name">{exercise.name}</div>
+                          <div className="ex-meta">{exerciseSummary(exercise)}</div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+              ) : (
+                <p className="muted">{screen === 'final' ? 'Workout complete.' : 'Single workout in progress.'}</p>
               )}
-              <button className="glass-btn" onClick={restart}>
-                Back to Start
-              </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </aside>
 
-        {/* ── Rest Screen ── */}
-        {screen === 'rest' && (
-          <div className="screen active">
-            <div className="title">Rest</div>
-            <SVGTimer
-              totalSeconds={restSeconds}
-              remainingSeconds={restRemaining}
-              circleId="rest-timer-circle"
-              textId="rest-timer-text"
-              onEnd={finishRest}
-              active
-            />
-            <div className="btn-group">
-              <button className="glass-btn glass-btn-primary" onClick={skipRest}>
-                Skip Rest
-              </button>
-            </div>
-          </div>
-        )}
+        {/* ── Right Panel ── */}
+        <main className="glass panel panel-right">
+          {/* ── Setup / routine overview ── */}
+          {screen === 'setup' && (
+            <div className="screen active">
+              <div className="title">Your Routine</div>
 
-        {/* ── Final Screen ── */}
-        {screen === 'final' && (
-          <div className="screen active">
-            <div className="title">Workout Complete!</div>
-            <div className="final-subtitle text-center">
-              {mode === 'reps'
-                ? `You completed ${total} reps with ${restSeconds}s rest between each.`
-                : `You completed ${total} sets of ${holdSeconds}s holds with ${restSeconds}s rest between each.`}
-            </div>
-            <div className="btn-group">
-              <button className="glass-btn" onClick={restart}>
-                Start Over
+              {count === 0 ? (
+                <div className="empty-state">
+                  Your routine is empty.<br />
+                  Add your first exercise using the form, then start the routine from here.
+                </div>
+              ) : (
+                <>
+                  <div className="list-header">
+                    <h3>{exercisesLabel}</h3>
+                    <button className="glass-btn glass-btn-danger glass-btn-sm" onClick={clearAllExercises}>
+                      Clear all
+                    </button>
+                  </div>
+
+                  <ol className="ex-list" style={{ marginBottom: '1.5rem' }}>
+                    {routine.exercises.map((exercise, index) => (
+                      <li key={exercise.id} className="ex-card">
+                        <span className="ex-index">{index + 1}</span>
+                        <div className="ex-body">
+                          <div className="ex-name">{exercise.name}</div>
+                          <div className="ex-meta">
+                            <span className={`badge badge-${exercise.type}`}>{exercise.type}</span>
+                            {exerciseSummary(exercise)}
+                          </div>
+                        </div>
+                        <div className="ex-actions">
+                          <button className="icon-btn" aria-label={`Move ${exercise.name} up`} title="Move up" disabled={index === 0} onClick={() => moveExercise(index, -1)}>↑</button>
+                          <button className="icon-btn" aria-label={`Move ${exercise.name} down`} title="Move down" disabled={index === count - 1} onClick={() => moveExercise(index, 1)}>↓</button>
+                          <button className="icon-btn danger" aria-label={`Remove ${exercise.name}`} title="Remove" onClick={() => removeExercise(exercise.id)}>✕</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
+
+              <button className="glass-btn glass-btn-primary" onClick={startRoutine} disabled={count === 0}>
+                ▶ Start Routine{count > 0 ? ` (${exercisesLabel})` : ''}
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* ── Rep Screen ── */}
+          {screen === 'rep' && (
+            <div className="screen active center">
+              {runHeader}
+              <div className="rep-info">Rep {current} of {total}</div>
+              <div className="btn-group">
+                <button className="glass-btn glass-btn-exercise" onClick={doneRep}>Done</button>
+                <button className="glass-btn glass-btn-ghost" onClick={stopWorkout}>Stop &amp; back to setup</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Exercise Screen ── */}
+          {screen === 'exercise' && (
+            <div className="screen active center">
+              {runHeader}
+              <div className="exercise-label">Hold</div>
+              <div className="exercise-info">Set {current} of {total}</div>
+              <SVGTimer
+                totalSeconds={holdSeconds}
+                remainingSeconds={exerciseRemaining}
+                circleId="exercise-timer-circle"
+                textId="exercise-timer-text"
+                onEnd={startRestTimer}
+                active={isExerciseActive}
+              />
+              <div className="btn-group">
+                {!exerciseRunning && (
+                  <button className="glass-btn glass-btn-exercise" onClick={startExercise}>Start</button>
+                )}
+                <button className="glass-btn glass-btn-ghost" onClick={stopWorkout}>Stop &amp; back to setup</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Rest Screen ── */}
+          {screen === 'rest' && (
+            <div className="screen active center">
+              {runHeader}
+              <div className="exercise-label">Rest</div>
+              <SVGTimer
+                totalSeconds={restSeconds}
+                remainingSeconds={restRemaining}
+                circleId="rest-timer-circle"
+                textId="rest-timer-text"
+                onEnd={finishRest}
+                active
+              />
+              <p className="up-next">Up next: <strong>{upNext}</strong></p>
+              <div className="btn-group">
+                <button className="glass-btn glass-btn-primary" onClick={skipRest}>Skip rest</button>
+                <button className="glass-btn glass-btn-ghost" onClick={stopWorkout}>Stop &amp; back to setup</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Final Screen ── */}
+          {screen === 'final' && (
+            <div className="screen active center">
+              <div className="title">Workout Complete! 🎉</div>
+              <div className="final-subtitle">
+                {routine.isRunning
+                  ? `You completed all ${exercisesLabel} in your routine.`
+                  : activeType === 'reps'
+                    ? `You completed ${total} reps with ${restSeconds}s rest between each.`
+                    : `You completed ${total} sets of ${holdSeconds}s holds with ${restSeconds}s rest between each.`}
+              </div>
+              <div className="btn-group">
+                {routine.isRunning && (
+                  <button className="glass-btn glass-btn-primary" onClick={startRoutine}>Repeat routine</button>
+                )}
+                <button className="glass-btn" onClick={restart}>Back to setup</button>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   )
