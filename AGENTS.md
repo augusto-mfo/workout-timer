@@ -117,5 +117,79 @@ This repo contains a single file: **`index.html`**. There is no build step, no d
 | `external_directory` | `deny` | Do not access or modify files outside this repository. |
 
 ## To Modify
-- Edit `index.html` in place — HTML, CSS, and JS are all inline.
-- There are no other files, scripts, or configs to worry about.
+- **React app (current):** Edit `workout-timer-app/src/App.tsx` — all logic, UI, and state management lives here.
+- **Legacy (do not touch):** `index.html` at the root is a prior v1 static file, not used by the React build.
+
+---
+
+# React App Architecture
+
+Source: `workout-timer-app/src/App.tsx`
+
+## Screens
+
+| Screen | State Value | Purpose |
+|--------|-------------|---------|
+| Setup | `'setup'` | Mode selector + input fields |
+| Reps | `'rep'` | Rep count + Done + Back buttons |
+| Exercise | `'exercise'` | Hold timer (SVG) + Start + Back buttons |
+| Rest | `'rest'` | Circular countdown + Skip Rest |
+| Final | `'final'` | Summary + Start Over |
+
+## Two Modes
+
+### Reps Mode
+- Config: number of reps + rest between reps
+- Flow: Rep screen → Done → Rest timer → next Rep → ... → Final
+
+### Timed Exercise Mode
+- Config: number of sets + hold time + rest between sets
+- Flow: Exercise screen → Start → countdown → Rest timer → next set → ... → Final
+- Use case: Isometric holds (plank, wall sit, etc.)
+
+## State Variables
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `mode` | `WorkoutMode` | `'reps'` or `'timed'` |
+| `screen` | `ScreenId` | Current screen identifier |
+| `total` | `number` | Total reps or sets |
+| `current` | `number` | Current rep/set position |
+| `restSeconds` | `number` | Rest duration |
+| `holdSeconds` | `number` | Hold duration |
+| `lastReps` | `number` | Last-used reps value (persisted) |
+| `lastRest` | `number` | Last-used rest (reps mode) |
+| `lastSets` | `number` | Last-used sets value (persisted) |
+| `lastHold` | `number` | Last-used hold value (persisted) |
+| `lastTimedRest` | `number` | Last-used rest (timed mode) |
+| `exerciseRemaining` | `number` | Exercise hold countdown |
+| `restRemaining` | `number` | Rest countdown |
+| `exerciseRunning` | `boolean` | Prevent double-start |
+
+## Key Functions
+
+| Function | Purpose |
+|----------|---------|
+| `showScreen(id)` | Set the active screen |
+| `selectMode(mode)` | Switch between Reps and Timed Exercise |
+| `startWorkout()` | Validate inputs, save last-used values, initialize state |
+| `startCountdown(totalSec, setRemaining, onEnd)` | Generic countdown with interval |
+| `showRepScreen()` | Show current rep info |
+| `doneRep()` | Complete rep → rest timer |
+| `showExerciseScreen()` | Reset exercise timer, show set info |
+| `startExercise()` | Begin hold countdown |
+| `startRestTimer()` | Begin rest countdown |
+| `skipRest()` | Skip rest, advance to next rep/set |
+| `finishRest()` | Navigate to next rep/set or final screen |
+| `getTimerColor(percentage)` | Green → Yellow → Red gradient |
+| `showFinalScreen()` | Display completion summary |
+| `restart()` | Clear intervals, reset state, go to setup |
+| `restoreInputs()` | Populate input fields from last-used values (or defaults) |
+
+## Last-Used Value Persistence
+
+Input fields retain the values from the most recent workout when restarting. Defaults are only applied on the very first page load.
+
+- **Defaults:** 10 reps, 30s rest, 5 sets, 30s hold, 30s timed rest
+- **Behavior:** Once a workout is started, those values are saved to state (`lastReps`, `lastRest`, etc.) and restored on every restart via `restoreInputs()`.
+- **Implementation:** A `useEffect` watches for `screen === 'setup'` and calls `restoreInputs()` after the input elements are rendered.

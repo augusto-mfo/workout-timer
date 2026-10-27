@@ -38,3 +38,11 @@ npm run build  # production build
 
 ## Key File
 **`workout-timer-app/src/App.tsx`** — this is the single source of truth. All logic, UI, and state management lives here.
+
+## Last-Used Value Persistence (Recent Change)
+Input fields retain the values from the most recent workout when restarting. Defaults are only applied on the very first page load.
+
+- **Defaults:** 10 reps, 30s rest, 5 sets, 30s hold, 30s timed rest
+- **Implementation:** `lastReps`, `lastRest`, `lastSets`, `lastHold`, `lastTimedRest` state variables store the last-used values. A `useEffect` watching `screen === 'setup'` calls `restoreInputs()` to populate the fields after they render.
+- **Saved in:** `startWorkout()` — values are persisted when a workout starts.
+- **Restored in:** `restart()` → `restoreInputs()` — called via effect when navigating back to setup.

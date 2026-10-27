@@ -102,7 +102,14 @@ export default function App() {
   const [restSeconds, setRestSeconds] = useState(0)
   const [holdSeconds, setHoldSeconds] = useState(0)
 
-  // Input values (uncontrolled for simplicity)
+  // Last-used values (persisted across restarts)
+  const [lastReps, setLastReps] = useState(10)
+  const [lastRest, setLastRest] = useState(30)
+  const [lastSets, setLastSets] = useState(5)
+  const [lastHold, setLastHold] = useState(30)
+  const [lastTimedRest, setLastTimedRest] = useState(30)
+
+  // Input refs
   const repsRef = useRef<HTMLInputElement>(null)
   const restRef = useRef<HTMLInputElement>(null)
   const setsRef = useRef<HTMLInputElement>(null)
@@ -111,6 +118,18 @@ export default function App() {
 
   const getNum = (el: HTMLInputElement | null, fallback = 0) =>
     parseInt(el?.value ?? String(fallback), 10)
+
+  // Restore input values from last-used state (or defaults on first load)
+  const restoreInputs = useCallback(() => {
+    if (mode === 'reps') {
+      if (repsRef.current) repsRef.current.value = String(lastReps)
+      if (restRef.current) restRef.current.value = String(lastRest)
+    } else {
+      if (setsRef.current) setsRef.current.value = String(lastSets)
+      if (holdRef.current) holdRef.current.value = String(lastHold)
+      if (timedRestRef.current) timedRestRef.current.value = String(lastTimedRest)
+    }
+  }, [mode, lastReps, lastRest, lastSets, lastHold, lastTimedRest])
 
   // Timer state
   const [exerciseRemaining, setExerciseRemaining] = useState(0)
@@ -133,6 +152,11 @@ export default function App() {
     }
   }, [])
 
+  // ── Initialize input values on mount ──
+  useEffect(() => {
+    restoreInputs()
+  }, [restoreInputs])
+
   // ── Screen Navigation ──
   const showScreen = useCallback((id: ScreenId) => {
     setScreen(id)
@@ -151,6 +175,8 @@ export default function App() {
       if (!validate(repsVal, 'reps') || !validate(restVal, 'rest')) return
       setTotal(repsVal)
       setRestSeconds(restVal)
+      setLastReps(repsVal)
+      setLastRest(restVal)
       setCurrent(1)
       showScreen('rep')
     } else {
@@ -166,6 +192,9 @@ export default function App() {
       setTotal(setsVal)
       setHoldSeconds(holdVal)
       setRestSeconds(timedRestVal)
+      setLastSets(setsVal)
+      setLastHold(holdVal)
+      setLastTimedRest(timedRestVal)
       setCurrent(1)
       setExerciseRemaining(holdVal)
       showScreen('exercise')
@@ -277,6 +306,13 @@ export default function App() {
     setScreen('setup')
   }, [])
 
+  // ── Restore inputs when switching to setup screen ──
+  useEffect(() => {
+    if (screen === 'setup') {
+      restoreInputs()
+    }
+  }, [screen, restoreInputs])
+
   // ── Render Helpers ──
   const isExerciseActive = screen === 'exercise' && exerciseRunning
 
@@ -318,7 +354,6 @@ export default function App() {
                 type="number"
                 id="reps-input"
                 min="1"
-                defaultValue={10}
                 className="glass-input"
               />
               <label htmlFor="rest-input" className="section-label">
@@ -329,7 +364,6 @@ export default function App() {
                 type="number"
                 id="rest-input"
                 min="1"
-                defaultValue={30}
                 className="glass-input"
               />
             </div>
@@ -344,7 +378,6 @@ export default function App() {
                 type="number"
                 id="sets-input"
                 min="1"
-                defaultValue={5}
                 className="glass-input"
               />
               <label htmlFor="hold-input" className="section-label">
@@ -355,7 +388,6 @@ export default function App() {
                 type="number"
                 id="hold-input"
                 min="1"
-                defaultValue={30}
                 className="glass-input"
               />
               <label htmlFor="timed-rest-input" className="section-label">
@@ -366,7 +398,6 @@ export default function App() {
                 type="number"
                 id="timed-rest-input"
                 min="1"
-                defaultValue={30}
                 className="glass-input"
               />
             </div>
