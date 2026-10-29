@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import type { WorkoutMode, ScreenId, RoutineState, Exercise } from './types'
 import { CIRCLE_RADIUS, CIRCLE_CIRCUMFERENCE, STORAGE_KEY } from './constants'
 import { SVGTimer } from './components/SVGTimer'
+import { Slider } from './components/Slider'
+import { formatSeconds, plural } from './helpers'
 
 // ── Validation ──
 
@@ -24,44 +26,6 @@ function loadExercises(): Exercise[] {
 
 // ── SVG Timer Component ──
 // Moved to src/components/SVGTimer.tsx
-
-const formatSeconds = (v: number) =>
-  v < 60 ? `${v} s` : `${Math.floor(v / 60)} min${v % 60 ? ` ${v % 60} s` : ''}`
-
-// ── Slider (label + live value + range input) ──
-function Slider({
-  id, label, value, min, max, step = 1, format, onChange,
-}: {
-  id: string
-  label: string
-  value: number
-  min: number
-  max: number
-  step?: number
-  format: (v: number) => string
-  onChange: (v: number) => void
-}) {
-  const pct = ((value - min) / (max - min)) * 100
-  return (
-    <div className="field">
-      <div className="slider-head">
-        <label htmlFor={id} className="section-label">{label}</label>
-        <output htmlFor={id} className="slider-value">{format(value)}</output>
-      </div>
-      <input
-        id={id}
-        type="range"
-        className="slider"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        style={{ '--pct': `${pct}%` } as React.CSSProperties}
-        onChange={e => onChange(Number(e.target.value))}
-      />
-    </div>
-  )
-}
 
 // ── Main App Component ──
 export default function App() {
@@ -328,7 +292,6 @@ export default function App() {
   const isExerciseActive = screen === 'exercise' && exerciseRunning
 
   // ── Render ──
-  const plural = (n: number | undefined, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
   const exerciseSummary = (ex: Exercise) =>
     (ex.type === 'reps'
       ? `${plural(ex.reps, 'rep')} · ${formatSeconds(ex.restBetweenReps ?? 0)} rest`
