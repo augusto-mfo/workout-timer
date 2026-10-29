@@ -1,9 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { WorkoutMode, ScreenId, RoutineState, Exercise } from './types'
-
-// ── SVG Timer Constants ──
-const CIRCLE_RADIUS = 80
-const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS
+import { CIRCLE_RADIUS, CIRCLE_CIRCUMFERENCE, STORAGE_KEY } from './constants'
 
 // ── Color Helper (identical to original) ──
 function getTimerColor(percentage: number): string {
@@ -28,7 +25,6 @@ function getTimerColor(percentage: number): string {
 }
 
 // ── Validation ──
-const STORAGE_KEY = 'workout-timer:routine:v1'
 
 function loadExercises(): Exercise[] {
   try {
