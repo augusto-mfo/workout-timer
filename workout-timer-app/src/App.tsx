@@ -1,25 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-
-// ── Types ──
-type WorkoutMode = 'reps' | 'timed'
-type ScreenId = 'setup' | 'rep' | 'exercise' | 'rest' | 'final'
-type RoutineState = {
-  exercises: Exercise[]
-  currentExerciseIndex: number
-  isRunning: boolean
-}
-
-interface Exercise {
-  id: string
-  name: string
-  type: WorkoutMode
-  reps?: number
-  restBetweenReps?: number
-  sets?: number
-  holdTime?: number
-  restBetweenSets?: number
-  load?: string // free text, optional (e.g. "10 x 2", "12 kg")
-}
+import type { WorkoutMode, ScreenId, RoutineState, Exercise } from './types'
 
 // ── SVG Timer Constants ──
 const CIRCLE_RADIUS = 80
