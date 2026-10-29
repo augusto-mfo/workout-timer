@@ -373,3 +373,126 @@ h1, h2, h3, h4, p { margin: 0; color: inherit; }
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* ── Plan bar ── */
+.plan-bar {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 72rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 0;
+}
+.plan-select {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 12rem; /* takes all remaining width: left edge = left panel, buttons follow to the right edge */
+  padding: 0 0.9rem;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-select:disabled { opacity: 0.45; cursor: not-allowed; }
+.plan-select option { background: #0f172a; color: #e2e8f0; }
+
+/* ── Top modal (confirm / prompt / alert) ── */
+@keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sheetDown { from { transform: translateY(-120%); } to { transform: translateY(0); } }
+@keyframes sheetUp { from { transform: translateY(0); } to { transform: translateY(-120%); } }
+
+.modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 1rem;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: modalFadeIn 0.2s ease both;
+}
+.modal-root.closing { animation: modalFadeOut 0.22s ease both; }
+
+.modal-sheet {
+  width: 100%;
+  max-width: 30rem;
+  margin-top: max(1rem, env(safe-area-inset-top));
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.92);
+  animation: sheetDown 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.modal-root.closing .modal-sheet { animation: sheetUp 0.22s ease-in both; }
+
+.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text-strong); }
+.modal-message { margin-top: 0.5rem; color: var(--text-muted); line-height: 1.45; }
+.modal-field { margin-top: 1rem; }
+.modal-input { text-align: left; }
+.modal-input[aria-invalid='true'] { border-color: rgba(var(--red), 0.6); }
+.modal-error { margin-top: 0.4rem; font-size: 0.85rem; color: #fecaca; }
+.modal-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+.modal-actions .glass-btn { flex: 1; padding: 0.7rem 1rem; font-size: 1rem; }
+
+/* Dropdown and its buttons share one height */
+.plan-bar { --plan-h: 2.6rem; }
+.plan-bar > * { height: var(--plan-h); }
+.plan-bar .glass-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ── Collapsible left panel ── */
+.panel-left { transition: flex-basis 0.25s ease, padding 0.25s ease; }
+.panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.panel-head .panel-title { margin: 0; }
+.panel-toggle { flex: none; }
+.panel-left.collapsed { flex: 0 0 3.5rem; padding: 1rem 0.5rem; align-items: center; }
+.panel-left.collapsed .panel-head { flex-direction: column; margin-bottom: 0; gap: 1rem; }
+.panel-left.collapsed .panel-title { writing-mode: vertical-rl; font-size: 1.1rem; white-space: nowrap; }
+@media (max-width: 860px) {
+  .panel-left.collapsed { flex: none; padding: 1.25rem; align-items: stretch; }
+  .panel-left.collapsed .panel-head { flex-direction: row; gap: 0.75rem; }
+  .panel-left.collapsed .panel-title { writing-mode: horizontal-tb; font-size: 1.35rem; }
+  .panel-toggle { transform: rotate(90deg); } /* ‹ / › become ▴ / ▾ when the panels are stacked */
+}
+
+/* ── Editable exercise cards ── */
+.ex-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.6rem;
+}
+.ex-main .ex-name, .ex-main .ex-meta { display: block; }
+.ex-card:has(.ex-main):hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.2); }
+.ex-card.editing, .ex-card.editing:hover { background: rgba(var(--violet), 0.18); border-color: rgba(var(--violet), 0.6); }
+.ex-card.editing .ex-index { background: rgba(var(--violet), 0.6); }
+.hint { font-size: 0.85rem; color: var(--text-muted); margin: -0.5rem 0 1rem; }
