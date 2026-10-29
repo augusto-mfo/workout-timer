@@ -1,28 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import type { WorkoutMode, ScreenId, RoutineState, Exercise } from './types'
 import { CIRCLE_RADIUS, CIRCLE_CIRCUMFERENCE, STORAGE_KEY } from './constants'
-
-// ── Color Helper (identical to original) ──
-function getTimerColor(percentage: number): string {
-  let r: number, g: number, b: number, t: number
-  if (percentage > 66) {
-    t = (100 - percentage) / 34
-    r = Math.round(34 * (1 - t) + 255 * t)
-    g = Math.round(211 * (1 - t) + 255 * t)
-    b = 34
-  } else if (percentage > 33) {
-    t = (66 - percentage) / 33
-    r = 255
-    g = Math.round(255 * (1 - t) + 128 * t)
-    b = 34
-  } else {
-    t = (33 - percentage) / 33
-    r = 255
-    g = Math.round(128 * (1 - t))
-    b = 34
-  }
-  return `rgb(${r},${g},${b})`
-}
+import { SVGTimer } from './components/SVGTimer'
 
 // ── Validation ──
 
@@ -43,50 +22,8 @@ function loadExercises(): Exercise[] {
   }
 }
 
-// ── SVG Timer Component (reusable for exercise & rest) ──
-function SVGTimer({
-  totalSeconds,
-  remainingSeconds,
-  circleId,
-  textId,
-  onEnd,
-  active,
-}: {
-  totalSeconds: number
-  remainingSeconds: number
-  circleId: string
-  textId: string
-  onEnd: () => void
-  active: boolean
-}) {
-  const circumference = CIRCLE_CIRCUMFERENCE
-  const percentage = totalSeconds > 0 ? remainingSeconds / totalSeconds : 1
-  const offset = circumference * (1 - percentage)
-  const color = getTimerColor(percentage * 100)
-
-  return (
-    <div className="timer-container" role="timer" aria-label={`${remainingSeconds} seconds remaining`}>
-      <svg className="timer-svg" viewBox="0 0 200 200">
-        <circle className="timer-bg" cx="100" cy="100" r={CIRCLE_RADIUS} />
-        <circle
-          className="timer-progress"
-          id={circleId}
-          cx="100"
-          cy="100"
-          r={CIRCLE_RADIUS}
-          style={{
-            strokeDasharray: circumference,
-            strokeDashoffset: active ? offset : 0,
-            stroke: active ? color : undefined,
-          }}
-        />
-      </svg>
-      <div className="timer-text" id={textId}>
-        {remainingSeconds}
-      </div>
-    </div>
-  )
-}
+// ── SVG Timer Component ──
+// Moved to src/components/SVGTimer.tsx
 
 const formatSeconds = (v: number) =>
   v < 60 ? `${v} s` : `${Math.floor(v / 60)} min${v % 60 ? ` ${v % 60} s` : ''}`
