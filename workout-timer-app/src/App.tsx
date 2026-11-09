@@ -6,6 +6,30 @@ import { Slider } from './components/Slider'
 import { TopModal } from './components/TopModal'
 import { formatSeconds, plural } from './helpers'
 
+// ── Audio ──
+
+function playBeep() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+
+    oscillator.frequency.value = 800 // 800 Hz beep
+    oscillator.type = 'sine'
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.3)
+  } catch {
+    // Audio not supported or error occurred - silently ignore
+  }
+}
+
 // ── Validation / persistence ──
 
 const newPlanId = () => `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -441,6 +465,7 @@ export default function App() {
   }
 
   const finishRest = () => {
+    playBeep()
     if (activeTypeRef.current === 'reps') {
       // `current` was already incremented in doneRep
       if (currentRef.current > totalRef.current) {
