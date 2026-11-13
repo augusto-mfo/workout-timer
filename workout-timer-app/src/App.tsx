@@ -4,6 +4,10 @@ import { CIRCLE_RADIUS, CIRCLE_CIRCUMFERENCE, STORAGE_KEY, PLANS_KEY, UI_KEY } f
 import { SVGTimer } from './components/SVGTimer'
 import { Slider } from './components/Slider'
 import { TopModal } from './components/TopModal'
+import { CameraTab } from './components/CameraTab'
+import { CameraDock } from './components/CameraDock'
+import { useCamera } from './hooks/useCamera'
+import type { CameraOverlay } from './components/CameraTab'
 import { formatSeconds, plural } from './helpers'
 
 // ── Audio ──
@@ -87,6 +91,10 @@ export default function App() {
   // ── State ──
   const [mode, setMode] = useState<WorkoutMode>('reps')
   const [screen, setScreen] = useState<ScreenId>('setup')
+
+  // Top-level tabs: the workout itself, or the optional camera mirror
+  const [tab, setTab] = useState<'workout' | 'camera'>('workout')
+  const cam = useCamera() // one camera, shared by the dock and the Camera tab
   const [total, setTotal] = useState(0)
   const [current, setCurrent] = useState(0)
   const [restSeconds, setRestSeconds] = useState(0)
@@ -557,6 +565,24 @@ export default function App() {
     return 'Finish'
   })()
 
+  // What the camera tab shows on top of the video while a workout is running
+  const runName = routine.isRunning ? (currentEx?.name ?? '') : 'Single workout'
+  const camOverlay: CameraOverlay | null =
+    screen === 'rep'
+      ? { title: runName, big: `${current}/${total}`, sub: 'Series', action: { label: 'Done', onClick: doneRep } }
+      : screen === 'exercise'
+        ? {
+            title: runName,
+            big: `${exerciseRunning ? exerciseRemaining : holdSeconds}s`,
+            sub: `Set ${current} of ${total}`,
+            action: exerciseRunning ? undefined : { label: 'Start', onClick: startExercise },
+          }
+        : screen === 'rest'
+          ? { title: 'Rest', big: `${restRemaining}s`, sub: `Up next: ${upNext}`, action: { label: 'Skip', onClick: skipRest } }
+          : screen === 'final'
+            ? { title: 'Workout complete 🎉' }
+            : null
+
   const runLoad = routine.isRunning ? currentEx?.load : singleLoad
   const runRepetitions = activeType === 'reps' ? (routine.isRunning ? currentEx?.repetitions : singleRepetitions) : undefined
   const runHeader = (
@@ -589,7 +615,18 @@ export default function App() {
         <h1>Simple Workout App</h1>
       </header>
 
-      <div className="plan-bar" role="group" aria-label="Workout plans">
+      <div className="tabs" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" id="tab-workout" aria-selected={tab === 'workout'}
+          className={`tab${tab === 'workout' ? ' active' : ''}`} onClick={() => setTab('workout')}>
+          Workout
+        </button>
+        <button type="button" role="tab" id="tab-camera" aria-selected={tab === 'camera'} aria-controls="panel-camera"
+          className={`tab${tab === 'camera' ? ' active' : ''}`} onClick={() => setTab('camera')}>
+          Camera{cam.live && <span className="tab-live" role="img" aria-label="camera on" />}
+        </button>
+      </div>
+
+      <div className="plan-bar" role="group" aria-label="Workout plans" style={tab === 'workout' ? undefined : { display: 'none' }}>
         <select
           className="glass-input plan-select"
           aria-label="Active plan"
@@ -614,7 +651,7 @@ export default function App() {
         </button>
       </div>
 
-      <div className="layout">
+      <div className="layout" style={tab === 'workout' ? undefined : { display: 'none' }}>
         {/* ── Left Panel: add-exercise form (setup) / progress (running) ── */}
         <aside ref={asideRef} className={`glass panel panel-left${leftCollapsed ? ' collapsed' : ''}`}>
           <div className="panel-head">
@@ -770,6 +807,9 @@ export default function App() {
 
         {/* ── Right Panel ── */}
         <main className="glass panel panel-right">
+          {/* Camera docked above the timer so progress and camera are visible together */}
+          <CameraDock cam={cam} onReview={() => setTab('camera')} />
+
           {/* ── Setup / routine overview ── */}
           {screen === 'setup' && (
             <div className="screen active">
@@ -903,6 +943,9 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Stays mounted so the camera keeps running when you switch tabs */}
+      <CameraTab cam={cam} visible={tab === 'camera'} overlay={camOverlay} />
     </div>
   )
 }
