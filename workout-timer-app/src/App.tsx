@@ -6,6 +6,7 @@ import { Slider } from './components/Slider'
 import { TopModal } from './components/TopModal'
 import { CameraTab } from './components/CameraTab'
 import { CameraDock } from './components/CameraDock'
+import { PlanSelect } from './components/PlanSelect'
 import { useCamera } from './hooks/useCamera'
 import type { CameraOverlay } from './components/CameraTab'
 import { formatSeconds, plural } from './helpers'
@@ -627,19 +628,13 @@ export default function App() {
       </div>
 
       <div className="plan-bar" role="group" aria-label="Workout plans" style={tab === 'workout' ? undefined : { display: 'none' }}>
-        <select
-          className="glass-input plan-select"
-          aria-label="Active plan"
+        <PlanSelect
+          ariaLabel="Active plan"
           value={activePlan.id}
           disabled={screen !== 'setup'}
-          onChange={e => selectPlan(e.target.value)}
-        >
-          {plansState.plans.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.exercises.length})
-            </option>
-          ))}
-        </select>
+          onChange={selectPlan}
+          options={plansState.plans.map(p => ({ id: p.id, label: `${p.name} (${p.exercises.length})` }))}
+        />
         <button className="glass-btn glass-btn-ghost glass-btn-sm" onClick={createPlan} disabled={screen !== 'setup'}>
           + New
         </button>

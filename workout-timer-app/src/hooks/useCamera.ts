@@ -131,7 +131,6 @@ export function useCamera() {
   }
 
   const start = () => startStream(facing)
-  const switchCamera = () => startStream(facing === 'user' ? 'environment' : 'user')
   const toggleMirror = () => setMirror(m => !m)
 
   // ── Recording ──
@@ -182,7 +181,7 @@ export function useCamera() {
 
   return {
     stream, live, busy, error, facing, mirror, recording, elapsed, clip, canRecord,
-    start, stop, switchCamera, toggleMirror, startRecording, stopRecording, discardClip,
+    start, stop, toggleMirror, startRecording, stopRecording, discardClip,
   }
 }
 

@@ -50,9 +50,6 @@ export function CameraDock({ cam, onReview }: { cam: CameraApi; onReview: () => 
             {cam.recording ? '■ Stop' : '● Record'}
           </button>
         )}
-        <button type="button" className="glass-btn glass-btn-ghost glass-btn-sm" onClick={cam.switchCamera} disabled={cam.busy || cam.recording}>
-          Switch
-        </button>
         <button type="button" className="glass-btn glass-btn-ghost glass-btn-sm" aria-pressed={cam.mirror} onClick={cam.toggleMirror}>
           Mirror
         </button>

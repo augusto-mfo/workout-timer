@@ -108,9 +108,6 @@ export function CameraTab({
                 <p className="muted cam-note">Recording is not supported on this browser; the mirror still works.</p>
               )}
               <div className="cam-row">
-                <button type="button" className="glass-btn glass-btn-ghost glass-btn-sm" onClick={cam.switchCamera} disabled={busy || recording}>
-                  Switch camera
-                </button>
                 <button type="button" className="glass-btn glass-btn-ghost glass-btn-sm" aria-pressed={mirror} onClick={cam.toggleMirror}>
                   Mirror: {mirror ? 'on' : 'off'}
                 </button>
