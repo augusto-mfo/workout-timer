@@ -10,6 +10,7 @@ import { PlanSelect } from './components/PlanSelect'
 import { useCamera } from './hooks/useCamera'
 import type { CameraOverlay } from './components/CameraTab'
 import { formatSeconds, plural } from './helpers'
+import { LightTheme, DarkTheme } from './components/Icons'
 
 // ── Audio ──
 
@@ -137,6 +138,14 @@ export default function App() {
   // Id of the exercise currently loaded in the form for editing (null = adding a new one)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(UI_KEY) ?? '{}').theme === 'light' ? 'light' : 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
+
   // Left panel can be collapsed; remembered across reloads
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => {
     try {
@@ -147,11 +156,14 @@ export default function App() {
   })
   useEffect(() => {
     try {
-      localStorage.setItem(UI_KEY, JSON.stringify({ leftCollapsed }))
+      localStorage.setItem(UI_KEY, JSON.stringify({ leftCollapsed, theme }))
     } catch {
       /* storage unavailable – ignore */
     }
-  }, [leftCollapsed])
+  }, [leftCollapsed, theme])
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
   const [singleLoad, setSingleLoad] = useState<string | undefined>(undefined)
   const [singleRepetitions, setSingleRepetitions] = useState<number | undefined>(undefined)
 
@@ -614,6 +626,9 @@ export default function App() {
 
       <header className="app-header">
         <h1>Simple Workout App</h1>
+        <button type="button" className="theme-toggle" onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {theme === 'dark' ? LightTheme : DarkTheme}
+        </button>
       </header>
 
       <div className="tabs" role="tablist" aria-label="Sections">
