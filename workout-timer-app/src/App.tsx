@@ -528,7 +528,7 @@ export default function App() {
   // ── Start Exercise (timed hold) ──
   const startExercise = () => {
     setExerciseRunning(true)
-    startCountdown(holdSeconds, setExerciseRemaining, () => latest.current.startRestTimer())
+    startCountdown(holdSeconds, setExerciseRemaining, () => { playBeep(); latest.current.startRestTimer() })
   }
 
   // ── Stop (asks first when a routine is in progress) ──
